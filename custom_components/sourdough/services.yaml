@@ -1,0 +1,147 @@
+record_feeding:
+  name: Record Feeding
+  description: >
+    Record that you have fed your sourdough starter. If amounts are omitted,
+    the configured defaults are used. Amounts should be in the unit system
+    configured for that entry (grams for metric, ounces for imperial).
+  fields:
+    entry_id:
+      name: Entry ID
+      description: >
+        The config entry ID of the sourdough tracker to update. Omit if you
+        only have one sourdough tracker configured.
+      required: false
+      example: "abc123def456"
+      selector:
+        text:
+    flour:
+      name: Flour Added
+      description: Amount of flour added (g or oz depending on your unit setting).
+      required: false
+      example: 60
+      selector:
+        number:
+          min: 0
+          max: 1000
+          step: 0.1
+          unit_of_measurement: "g / oz"
+    water:
+      name: Water Added
+      description: Amount of water added (g or oz depending on your unit setting).
+      required: false
+      example: 60
+      selector:
+        number:
+          min: 0
+          max: 1000
+          step: 0.1
+          unit_of_measurement: "g / oz"
+    discarded:
+      name: Discarded Amount
+      description: >
+        Amount of starter discarded before feeding (g or oz). Omit or set to 0
+        for Days 1 and 2 when no discard is needed.
+      required: false
+      example: 60
+      selector:
+        number:
+          min: 0
+          max: 10000
+          step: 0.1
+          unit_of_measurement: "g / oz"
+    timestamp:
+      name: Feeding Timestamp
+      description: >
+        When the feeding actually happened. Use this to backdate a feeding you
+        forgot to record, or to set the correct "last fed" time when you are
+        catching up after starting the integration mid-recipe.
+        If omitted, the current time is used.
+      required: false
+      example: "2026-03-08 09:00:00"
+      selector:
+        datetime:
+
+set_weight:
+  name: Set Current Weight
+  description: >
+    Record the current weight of your starter as measured on a scale.
+    This becomes the baseline for all future weight estimates — only feedings
+    recorded after this point are added on top. Use this when you are setting
+    up the integration mid-recipe and already have starter in the vessel.
+  fields:
+    weight:
+      name: Weight
+      description: >
+        The measured weight (g for metric, oz for imperial). By default this is
+        assumed to be the total weight including the vessel; set includes_vessel
+        to false if you are entering the starter weight on its own.
+      required: true
+      example: 350
+      selector:
+        number:
+          min: 0
+          max: 10000
+          step: 0.1
+          unit_of_measurement: "g / oz"
+    includes_vessel:
+      name: Includes Vessel
+      description: >
+        Set to true (default) if the weight reading includes the vessel/jar.
+        The configured vessel tare will be subtracted automatically.
+        Set to false if you have already tared the scale with the vessel on it.
+      required: false
+      default: true
+      selector:
+        boolean:
+    entry_id:
+      name: Entry ID
+      description: >
+        The config entry ID of the sourdough tracker to update. Omit if you
+        only have one sourdough tracker configured.
+      required: false
+      selector:
+        text:
+
+set_day:
+  name: Set Current Day
+  description: >
+    Set the current recipe day. Use this when you have set up the integration
+    mid-recipe and need to tell it which day you are on. The start datetime is
+    adjusted automatically so the day counter shows the correct value.
+  fields:
+    day:
+      name: Day
+      description: The recipe day number to set (1 = first day, 3 = discard starts, etc.).
+      required: true
+      example: 3
+      selector:
+        number:
+          min: 1
+          max: 30
+          step: 1
+          mode: box
+    entry_id:
+      name: Entry ID
+      description: >
+        The config entry ID of the sourdough tracker to update. Omit if you
+        only have one sourdough tracker configured.
+      required: false
+      example: "abc123def456"
+      selector:
+        text:
+
+reset_process:
+  name: Reset Process
+  description: >
+    Reset the sourdough process to Day 1. This clears all feeding history and
+    resets the start time to now. Use this if you are starting fresh.
+  fields:
+    entry_id:
+      name: Entry ID
+      description: >
+        The config entry ID of the sourdough tracker to reset. Omit if you
+        only have one sourdough tracker configured.
+      required: false
+      example: "abc123def456"
+      selector:
+        text:
