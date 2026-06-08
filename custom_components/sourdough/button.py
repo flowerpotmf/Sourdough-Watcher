@@ -30,6 +30,7 @@ async def async_setup_entry(
 
     async_add_entities([
         SourdoughRecordFeedingButton(coordinator, entry),
+        SourdoughSkipFeedingButton(coordinator, entry),
         SourdoughResetButton(coordinator, entry),
     ])
 
@@ -56,6 +57,28 @@ class SourdoughRecordFeedingButton(
         data = self.coordinator.data or {}
         discarded_g = data.get("discard_amount_g", 0.0) if data.get("should_discard") else 0.0
         await self.coordinator.async_record_feeding(discarded_g=discarded_g)
+
+
+class SourdoughSkipFeedingButton(
+    CoordinatorEntity[SourdoughCoordinator], ButtonEntity
+):
+    """Skip (snooze) the upcoming feeding by one interval.
+
+    Pushes the next-feeding time forward without logging a feeding — useful
+    when you intentionally skip a scheduled feeding.
+    """
+
+    _attr_has_entity_name = True
+    _attr_name = "Skip Feeding"
+    _attr_icon = "mdi:debug-step-over"
+
+    def __init__(self, coordinator: SourdoughCoordinator, entry: ConfigEntry) -> None:
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{entry.entry_id}_skip_feeding"
+        self._attr_device_info = _device_info(entry)
+
+    async def async_press(self) -> None:
+        await self.coordinator.async_skip_feeding()
 
 
 class SourdoughResetButton(

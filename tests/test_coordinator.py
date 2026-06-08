@@ -6,12 +6,14 @@ up the Frame helper) with dt_util.now patched to a fixed datetime.
 """
 
 from datetime import datetime, timedelta, timezone
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
+import homeassistant.util.dt as dt_util
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.sourdough.const import (
+    CONF_MAINTENANCE_DISCARD,
     CONF_MAINTENANCE_INTERVAL_HOURS,
     CONF_VESSEL_TARE,
     DOMAIN,
@@ -69,6 +71,13 @@ class TestPhaseForDay:
         """Days 1-7 keep their fixed recipe interval regardless of the override."""
         hours, _ = _get_phase_for_day(day, maintenance_interval_hours=168)
         assert hours != 168
+
+    def test_maintenance_discard_toggle(self):
+        """Maintenance discard follows the maintenance_discard argument."""
+        _, discard_off = _get_phase_for_day(10, 168, maintenance_discard=False)
+        _, discard_on = _get_phase_for_day(10, 168, maintenance_discard=True)
+        assert discard_off is False
+        assert discard_on is True
 
 
 class TestHumanizeInterval:
@@ -253,3 +262,44 @@ class TestComputeState:
         expected_next = last_fed + timedelta(hours=168)
         assert state["next_feeding_dt"] == expected_next.isoformat()
         assert state["is_overdue"] is False
+
+    async def test_maintenance_discard_can_be_disabled(self, hass):
+        """With maintenance discard off, no discard is required on Day 8+."""
+        stored = {
+            "start_datetime": _ts(_NOW - timedelta(days=9)),
+            "feedings": [
+                {"timestamp": _ts(_NOW), "flour_g": 60, "water_g": 60, "discarded_g": 0}
+            ],
+        }
+        config = {**DEFAULT_CONFIG, CONF_MAINTENANCE_DISCARD: False}
+        coord = _make_coord(hass, config=config, stored=stored)
+        with patch(_DT_NOW, return_value=_NOW):
+            state = coord._compute_state()
+        assert state["current_day"] == 10
+        assert state["phase"] == "Maintenance"
+        assert state["should_discard"] is False
+        assert state["discard_amount_g"] == 0.0
+
+    async def test_skip_feeding_pushes_next_due_by_one_interval(self, hass):
+        """Skipping advances the next-feeding time by one interval, no feeding logged."""
+        last_fed = _NOW - timedelta(hours=1)
+        stored = {
+            "start_datetime": _ts(_NOW - timedelta(days=9)),
+            "feedings": [
+                {"timestamp": _ts(last_fed), "flour_g": 60, "water_g": 60, "discarded_g": 0}
+            ],
+        }
+        config = {**DEFAULT_CONFIG, CONF_MAINTENANCE_INTERVAL_HOURS: 12.0}
+        coord = _make_coord(hass, config=config, stored=stored)
+        coord._store.async_save = AsyncMock()
+        with patch(_DT_NOW, return_value=_NOW):
+            before = coord._compute_state()
+            await coord.async_skip_feeding()
+            after = coord._compute_state()
+
+        before_due = dt_util.parse_datetime(before["next_feeding_dt"])
+        after_due = dt_util.parse_datetime(after["next_feeding_dt"])
+        assert after_due - before_due == timedelta(hours=12)
+        # No feeding was logged by skipping.
+        assert after["feeding_count"] == before["feeding_count"]
+        assert coord._store.async_save.await_count == 1

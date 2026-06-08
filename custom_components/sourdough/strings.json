@@ -16,10 +16,12 @@
           "water_g": "Water per feeding",
           "vessel_tare_g": "Empty vessel / jar weight (0 to skip)",
           "discard_ratio": "Discard ratio (0.5 = discard half)",
-          "maintenance_interval_hours": "Maintenance feeding interval (hours)"
+          "maintenance_interval_hours": "Maintenance feeding interval (hours)",
+          "maintenance_discard": "Discard during maintenance"
         },
         "data_description": {
-          "maintenance_interval_hours": "How often to feed once the starter is mature (Day 8+). Use 12 for a room-temperature starter, or 168 (7 days) for a fridge-stored, weekly-fed starter as in The Sourdough Framework."
+          "maintenance_interval_hours": "How often to feed once the starter is mature (Day 8+). Use 12 for a room-temperature starter, or 168 (7 days) for a fridge-stored, weekly-fed starter as in The Sourdough Framework.",
+          "maintenance_discard": "Whether to discard part of the starter before each maintenance feeding. Turn off if you keep a small amount instead of discarding (common for fridge-stored, weekly routines)."
         }
       }
     },
@@ -38,10 +40,12 @@
           "water_g": "Water per feeding",
           "vessel_tare_g": "Empty vessel / jar weight (0 to skip)",
           "discard_ratio": "Discard ratio (0.5 = discard half)",
-          "maintenance_interval_hours": "Maintenance feeding interval (hours)"
+          "maintenance_interval_hours": "Maintenance feeding interval (hours)",
+          "maintenance_discard": "Discard during maintenance"
         },
         "data_description": {
-          "maintenance_interval_hours": "How often to feed once the starter is mature (Day 8+). Use 12 for a room-temperature starter, or 168 (7 days) for a fridge-stored, weekly-fed starter as in The Sourdough Framework."
+          "maintenance_interval_hours": "How often to feed once the starter is mature (Day 8+). Use 12 for a room-temperature starter, or 168 (7 days) for a fridge-stored, weekly-fed starter as in The Sourdough Framework.",
+          "maintenance_discard": "Whether to discard part of the starter before each maintenance feeding. Turn off if you keep a small amount instead of discarding (common for fridge-stored, weekly routines)."
         }
       }
     },
@@ -55,6 +59,10 @@
     "record_feeding": {
       "name": "Record Feeding",
       "description": "Record a sourdough feeding event."
+    },
+    "skip_feeding": {
+      "name": "Skip Feeding",
+      "description": "Skip (snooze) the upcoming feeding by one interval."
     },
     "reset_process": {
       "name": "Reset Process",

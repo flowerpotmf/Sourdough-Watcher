@@ -8,6 +8,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.sourdough.const import (
     CONF_DISCARD_RATIO,
     CONF_FLOUR_AMOUNT,
+    CONF_MAINTENANCE_DISCARD,
     CONF_MAINTENANCE_INTERVAL_HOURS,
     CONF_UNIT_SYSTEM,
     CONF_VESSEL_TARE,
@@ -23,6 +24,7 @@ AMOUNTS_METRIC = {
     CONF_VESSEL_TARE: 200.0,
     CONF_DISCARD_RATIO: 0.5,
     CONF_MAINTENANCE_INTERVAL_HOURS: 168.0,
+    CONF_MAINTENANCE_DISCARD: False,
 }
 
 
@@ -55,6 +57,7 @@ async def test_full_metric_flow(hass):
     assert result["data"][CONF_WATER_AMOUNT] == pytest.approx(60.0)
     assert result["data"][CONF_VESSEL_TARE] == pytest.approx(200.0)
     assert result["data"][CONF_MAINTENANCE_INTERVAL_HOURS] == pytest.approx(168.0)
+    assert result["data"][CONF_MAINTENANCE_DISCARD] is False
 
 
 async def test_full_imperial_flow(hass):
@@ -76,6 +79,7 @@ async def test_full_imperial_flow(hass):
             CONF_VESSEL_TARE: 7.0,
             CONF_DISCARD_RATIO: 0.5,
             CONF_MAINTENANCE_INTERVAL_HOURS: 168.0,
+            CONF_MAINTENANCE_DISCARD: True,
         },
     )
     assert result["type"] == FlowResultType.CREATE_ENTRY
@@ -144,9 +148,11 @@ async def test_options_flow_updates_amounts(hass):
             CONF_VESSEL_TARE: 250.0,
             CONF_DISCARD_RATIO: 0.4,
             CONF_MAINTENANCE_INTERVAL_HOURS: 168.0,
+            CONF_MAINTENANCE_DISCARD: False,
         },
     )
     assert result["type"] == FlowResultType.CREATE_ENTRY
     assert entry.options[CONF_FLOUR_AMOUNT] == pytest.approx(80.0)
     assert entry.options[CONF_DISCARD_RATIO] == pytest.approx(0.4)
     assert entry.options[CONF_MAINTENANCE_INTERVAL_HOURS] == pytest.approx(168.0)
+    assert entry.options[CONF_MAINTENANCE_DISCARD] is False

@@ -46,6 +46,21 @@ DEFAULT_MAINTENANCE_INTERVAL_HOURS = 12.0
 MIN_MAINTENANCE_INTERVAL_HOURS = 1.0
 MAX_MAINTENANCE_INTERVAL_HOURS = 720.0  # 30 days
 
+# Whether to discard part of the starter before each maintenance feeding.
+# A room-temperature starter is usually discarded down (True). Some
+# fridge-stored, weekly routines keep a small amount instead of discarding —
+# set this to False to drop the discard step (and its alerts) in maintenance.
+DEFAULT_MAINTENANCE_DISCARD = True
+
+# Convenience presets surfaced by the "Maintenance cadence" select entity,
+# mapping a human label to an interval in hours.
+MAINTENANCE_PRESETS = {
+    "Twice daily (12h)": 12.0,
+    "Daily (24h)": 24.0,
+    "Every 2 days (48h)": 48.0,
+    "Weekly — fridge (168h)": 168.0,
+}
+
 # Recipe phase definitions for the fixed establishment period:
 # (min_day, max_day, interval_hours, discard). Day MAINTENANCE_START_DAY and
 # beyond are handled separately so the interval can be customised.
@@ -63,12 +78,14 @@ CONF_DISCARD_RATIO = "discard_ratio"
 CONF_UNIT_SYSTEM = "unit_system"
 CONF_START_DATETIME = "start_datetime"
 CONF_MAINTENANCE_INTERVAL_HOURS = "maintenance_interval_hours"
+CONF_MAINTENANCE_DISCARD = "maintenance_discard"
 
 # Service names
 SERVICE_RECORD_FEEDING = "record_feeding"
 SERVICE_RESET = "reset_process"
 SERVICE_SET_DAY = "set_day"
 SERVICE_SET_WEIGHT = "set_weight"
+SERVICE_SKIP_FEEDING = "skip_feeding"
 
 # Sensor unique ID suffixes
 SENSOR_DAY = "day"

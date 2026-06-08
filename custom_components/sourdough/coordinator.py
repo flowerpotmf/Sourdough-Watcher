@@ -15,11 +15,13 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from .const import (
     CONF_DISCARD_RATIO,
     CONF_FLOUR_AMOUNT,
+    CONF_MAINTENANCE_DISCARD,
     CONF_MAINTENANCE_INTERVAL_HOURS,
     CONF_VESSEL_TARE,
     CONF_WATER_AMOUNT,
     DEFAULT_DISCARD_RATIO,
     DEFAULT_FLOUR_GRAMS,
+    DEFAULT_MAINTENANCE_DISCARD,
     DEFAULT_MAINTENANCE_INTERVAL_HOURS,
     DEFAULT_VESSEL_TARE_GRAMS,
     DEFAULT_WATER_GRAMS,
@@ -37,19 +39,21 @@ SCAN_INTERVAL = timedelta(minutes=1)
 def _get_phase_for_day(
     day: int,
     maintenance_interval_hours: float = DEFAULT_MAINTENANCE_INTERVAL_HOURS,
+    maintenance_discard: bool = DEFAULT_MAINTENANCE_DISCARD,
 ) -> tuple[float, bool]:
     """Return (interval_hours, should_discard) for the given recipe day.
 
     Days 1-7 follow the fixed establishment schedule in RECIPE_PHASES. From the
     maintenance phase onward the interval is whatever the user configured
     (``maintenance_interval_hours``) — 12h for a room-temperature starter, or
-    e.g. 168h for a fridge-stored, weekly-fed starter.
+    e.g. 168h for a fridge-stored, weekly-fed starter — and whether the starter
+    is discarded each time follows ``maintenance_discard``.
     """
     for min_day, max_day, interval_hours, discard in RECIPE_PHASES:
         if min_day <= day <= max_day:
             return interval_hours, discard
-    # Maintenance phase: user-configurable interval, still discarding by default.
-    return maintenance_interval_hours, True
+    # Maintenance phase: user-configurable interval and discard behaviour.
+    return maintenance_interval_hours, maintenance_discard
 
 
 def _humanize_interval(hours: float) -> str:
@@ -222,8 +226,11 @@ class SourdoughCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 DEFAULT_MAINTENANCE_INTERVAL_HOURS,
             )
         )
+        maintenance_discard = bool(
+            cfg.get(CONF_MAINTENANCE_DISCARD, DEFAULT_MAINTENANCE_DISCARD)
+        )
         interval_hours, should_discard = _get_phase_for_day(
-            current_day, maintenance_interval_hours
+            current_day, maintenance_interval_hours, maintenance_discard
         )
         phase_label = _phase_label(current_day)
 
@@ -238,7 +245,16 @@ class SourdoughCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         else:
             next_feeding_dt = start_dt + timedelta(hours=interval_hours)
 
-        # Overdue?
+        # A skip ("snooze") pushes the next feeding forward without logging a
+        # real feeding. The override is cleared the moment a feeding is recorded.
+        override_raw = self._stored.get("next_due_override")
+        if override_raw:
+            override_dt = dt_util.parse_datetime(override_raw)
+            if override_dt and override_dt > next_feeding_dt:
+                next_feeding_dt = override_dt
+
+        # Due / overdue?
+        is_due = now >= next_feeding_dt
         is_overdue = now > next_feeding_dt
         overdue_minutes = max(0.0, (now - next_feeding_dt).total_seconds() / 60)
 
@@ -271,7 +287,10 @@ class SourdoughCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "current_day": current_day,
             "phase": phase_label,
             "interval_hours": interval_hours,
+            "maintenance_interval_hours": maintenance_interval_hours,
+            "maintenance_discard": maintenance_discard,
             "should_discard": should_discard,
+            "is_due": is_due,
             "is_overdue": is_overdue,
             "overdue_minutes": round(overdue_minutes, 1),
             "last_feeding_dt": last_feeding_dt.isoformat() if last_feeding_dt else None,
@@ -304,6 +323,11 @@ class SourdoughCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             feedings, flour_g, water_g, self._stored.get("weight_baseline")
         )
 
+    @property
+    def feedings(self) -> list[dict]:
+        """Return the recorded feeding log (oldest first)."""
+        return list(self._stored.get("feedings", []))
+
     # ------------------------------------------------------------------
     # Mutating operations
     # ------------------------------------------------------------------
@@ -335,6 +359,23 @@ class SourdoughCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "discarded_g": discarded_g if discarded_g is not None else 0.0,
         }
         self._stored.setdefault("feedings", []).append(feeding)
+        # A real feeding resets the schedule, so any outstanding skip is cleared.
+        self._stored.pop("next_due_override", None)
+        await self._store.async_save(self._stored)
+        await self.async_refresh()
+
+    async def async_skip_feeding(self) -> None:
+        """Skip ("snooze") the upcoming feeding by one interval.
+
+        Pushes the next-feeding time forward by the current interval without
+        logging a feeding. Useful when you intentionally skip a scheduled
+        feeding (e.g. a fridge-stored starter you are not baking with this week).
+        """
+        state = self._compute_state()
+        next_dt = dt_util.parse_datetime(state["next_feeding_dt"]) or dt_util.now()
+        interval_hours = float(state["interval_hours"])
+        new_due = next_dt + timedelta(hours=interval_hours)
+        self._stored["next_due_override"] = new_due.isoformat()
         await self._store.async_save(self._stored)
         await self.async_refresh()
 

@@ -130,6 +130,23 @@ set_day:
       selector:
         text:
 
+skip_feeding:
+  name: Skip Feeding
+  description: >
+    Skip (snooze) the upcoming feeding by one interval without logging a
+    feeding. Useful when you intentionally miss a scheduled feeding. The skip
+    is cleared automatically the next time a feeding is recorded.
+  fields:
+    entry_id:
+      name: Entry ID
+      description: >
+        The config entry ID of the sourdough tracker to update. Omit if you
+        only have one sourdough tracker configured.
+      required: false
+      example: "abc123def456"
+      selector:
+        text:
+
 reset_process:
   name: Reset Process
   description: >

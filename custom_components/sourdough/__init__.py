@@ -18,13 +18,22 @@ from .const import (
     SERVICE_RESET,
     SERVICE_SET_DAY,
     SERVICE_SET_WEIGHT,
+    SERVICE_SKIP_FEEDING,
     UNIT_IMPERIAL,
 )
 from .coordinator import SourdoughCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
-_PLATFORMS = [Platform.SENSOR, Platform.NUMBER, Platform.BUTTON]
+_PLATFORMS = [
+    Platform.SENSOR,
+    Platform.BINARY_SENSOR,
+    Platform.NUMBER,
+    Platform.SELECT,
+    Platform.SWITCH,
+    Platform.BUTTON,
+    Platform.CALENDAR,
+]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -55,6 +64,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             hass.services.async_remove(DOMAIN, SERVICE_RESET)
             hass.services.async_remove(DOMAIN, SERVICE_SET_DAY)
             hass.services.async_remove(DOMAIN, SERVICE_SET_WEIGHT)
+            hass.services.async_remove(DOMAIN, SERVICE_SKIP_FEEDING)
     return unload_ok
 
 
@@ -209,4 +219,27 @@ def _register_services(
             SERVICE_SET_WEIGHT,
             handle_set_weight,
             schema=set_weight_schema,
+        )
+
+    # Service: skip_feeding
+    skip_schema = vol.Schema(
+        {
+            vol.Optional("entry_id"): cv.string,
+        }
+    )
+
+    async def handle_skip_feeding(call: ServiceCall) -> None:
+        target_entry_id = call.data.get("entry_id", entry.entry_id)
+        target_coordinator: SourdoughCoordinator = hass.data[DOMAIN].get(target_entry_id)
+        if target_coordinator is None:
+            _LOGGER.error("No sourdough entry found with id: %s", target_entry_id)
+            return
+        await target_coordinator.async_skip_feeding()
+
+    if not hass.services.has_service(DOMAIN, SERVICE_SKIP_FEEDING):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_SKIP_FEEDING,
+            handle_skip_feeding,
+            schema=skip_schema,
         )
