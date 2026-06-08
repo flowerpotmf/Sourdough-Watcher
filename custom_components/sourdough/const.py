@@ -33,12 +33,26 @@ DEFAULT_WATER_GRAMS = 60.0
 DEFAULT_DISCARD_RATIO = 0.5  # discard 50% before each feeding (Day 3+)
 DEFAULT_VESSEL_TARE_GRAMS = 0.0
 
-# Recipe phase definitions: (min_day, max_day, interval_hours, discard)
+# Day on which the starter enters the open-ended maintenance phase. From this
+# day onward the feeding interval is user-configurable (see
+# DEFAULT_MAINTENANCE_INTERVAL_HOURS) rather than fixed by the recipe.
+MAINTENANCE_START_DAY = 8
+
+# Default maintenance feeding interval (hours). 12h suits a starter kept at
+# room temperature. Bakers who follow a fridge-stored, weekly-feeding routine
+# (e.g. Hendrik Kleinwächter's "The Sourdough Framework") can set this to 168h
+# (7 days) in the integration's options. Range enforced by the config flow.
+DEFAULT_MAINTENANCE_INTERVAL_HOURS = 12.0
+MIN_MAINTENANCE_INTERVAL_HOURS = 1.0
+MAX_MAINTENANCE_INTERVAL_HOURS = 720.0  # 30 days
+
+# Recipe phase definitions for the fixed establishment period:
+# (min_day, max_day, interval_hours, discard). Day MAINTENANCE_START_DAY and
+# beyond are handled separately so the interval can be customised.
 RECIPE_PHASES = [
     (1, 2, 24, False),   # Days 1-2: feed every 24h, no discard
     (3, 5, 24, True),    # Days 3-5: discard half, feed every 24h
     (6, 7, 12, True),    # Days 6-7: discard half, feed every 12h
-    (8, 999, 12, True),  # Day 8+: maintenance, every 12h
 ]
 
 # Configuration keys
@@ -48,6 +62,7 @@ CONF_WATER_AMOUNT = "water_g"
 CONF_DISCARD_RATIO = "discard_ratio"
 CONF_UNIT_SYSTEM = "unit_system"
 CONF_START_DATETIME = "start_datetime"
+CONF_MAINTENANCE_INTERVAL_HOURS = "maintenance_interval_hours"
 
 # Service names
 SERVICE_RECORD_FEEDING = "record_feeding"

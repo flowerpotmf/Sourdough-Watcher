@@ -12,19 +12,21 @@
         }
       },
       "amounts": {
-        "title": "Feeding Amounts",
+        "title": "Feeding Amounts & Schedule",
         "description": "Set the amounts for each feeding. The recipe default is ½ cup flour ({recipe_flour}) and ¼ cup water ({recipe_water}) per feeding.",
         "data": {
           "flour_g": "Flour per feeding ({unit})",
           "water_g": "Water per feeding ({unit})",
           "vessel_tare_g": "Empty vessel / jar weight ({unit}, 0 to skip)",
-          "discard_ratio": "Discard ratio (0.5 = discard half)"
+          "discard_ratio": "Discard ratio (0.5 = discard half)",
+          "maintenance_interval_hours": "Maintenance feeding interval (hours)"
         },
         "data_description": {
           "flour_g": "Amount of flour added at each feeding. Recipe default: {recipe_flour}.",
           "water_g": "Amount of water added at each feeding. Recipe default: {recipe_water}.",
           "vessel_tare_g": "Weight of the empty jar or container. Used to calculate how much starter you have.",
-          "discard_ratio": "Fraction of starter to discard before each feeding on Day 3 and beyond."
+          "discard_ratio": "Fraction of starter to discard before each feeding on Day 3 and beyond.",
+          "maintenance_interval_hours": "How often to feed once the starter is mature (Day 8+). Use 12 for a room-temperature starter, or 168 (7 days) for a fridge-stored, weekly-fed starter as in The Sourdough Framework."
         }
       }
     },
@@ -40,12 +42,16 @@
   "options": {
     "step": {
       "init": {
-        "title": "Update Feeding Amounts",
+        "title": "Update Feeding Amounts & Schedule",
         "data": {
           "flour_g": "Flour per feeding",
           "water_g": "Water per feeding",
           "vessel_tare_g": "Empty vessel / jar weight (0 to skip)",
-          "discard_ratio": "Discard ratio (0.5 = discard half)"
+          "discard_ratio": "Discard ratio (0.5 = discard half)",
+          "maintenance_interval_hours": "Maintenance feeding interval (hours)"
+        },
+        "data_description": {
+          "maintenance_interval_hours": "How often to feed once the starter is mature (Day 8+). Use 12 for a room-temperature starter, or 168 (7 days) for a fridge-stored, weekly-fed starter as in The Sourdough Framework."
         }
       }
     },

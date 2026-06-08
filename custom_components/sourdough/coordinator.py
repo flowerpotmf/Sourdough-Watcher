@@ -15,10 +15,12 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from .const import (
     CONF_DISCARD_RATIO,
     CONF_FLOUR_AMOUNT,
+    CONF_MAINTENANCE_INTERVAL_HOURS,
     CONF_VESSEL_TARE,
     CONF_WATER_AMOUNT,
     DEFAULT_DISCARD_RATIO,
     DEFAULT_FLOUR_GRAMS,
+    DEFAULT_MAINTENANCE_INTERVAL_HOURS,
     DEFAULT_VESSEL_TARE_GRAMS,
     DEFAULT_WATER_GRAMS,
     DOMAIN,
@@ -32,13 +34,47 @@ _LOGGER = logging.getLogger(__name__)
 SCAN_INTERVAL = timedelta(minutes=1)
 
 
-def _get_phase_for_day(day: int) -> tuple[int, bool]:
-    """Return (interval_hours, should_discard) for the given recipe day."""
+def _get_phase_for_day(
+    day: int,
+    maintenance_interval_hours: float = DEFAULT_MAINTENANCE_INTERVAL_HOURS,
+) -> tuple[float, bool]:
+    """Return (interval_hours, should_discard) for the given recipe day.
+
+    Days 1-7 follow the fixed establishment schedule in RECIPE_PHASES. From the
+    maintenance phase onward the interval is whatever the user configured
+    (``maintenance_interval_hours``) — 12h for a room-temperature starter, or
+    e.g. 168h for a fridge-stored, weekly-fed starter.
+    """
     for min_day, max_day, interval_hours, discard in RECIPE_PHASES:
         if min_day <= day <= max_day:
             return interval_hours, discard
-    # Fallback: maintenance
-    return 12, True
+    # Maintenance phase: user-configurable interval, still discarding by default.
+    return maintenance_interval_hours, True
+
+
+def _humanize_interval(hours: float) -> str:
+    """Render a feeding interval as friendly text for use after "feed ...".
+
+    Whole multiples of a week or a day are described in those units so that a
+    168h maintenance interval reads as "every week" rather than "every 168
+    hours". Examples: 12 -> "every 12 hours", 24 -> "every day",
+    48 -> "every 2 days", 168 -> "every week", 336 -> "every 2 weeks".
+    """
+    hours = float(hours)
+
+    def _phrase(value: float, unit: str) -> str:
+        whole = int(value)
+        if abs(value - whole) < 1e-9:
+            if whole == 1:
+                return f"every {unit}"
+            return f"every {whole} {unit}s"
+        return f"every {round(value, 1)} {unit}s"
+
+    if hours >= 168 and hours % 168 == 0:
+        return _phrase(hours / 168, "week")
+    if hours >= 24 and hours % 24 == 0:
+        return _phrase(hours / 24, "day")
+    return _phrase(hours, "hour")
 
 
 def _phase_label(day: int) -> str:
@@ -71,8 +107,9 @@ def _build_instructions(day: int, should_discard: bool, interval_hours: int, is_
     elif day <= 7:
         action = "Discard half the starter, then add flour and water. Feed every 12 hours."
     else:
+        cadence = _humanize_interval(interval_hours)
         action = (
-            "Continue discarding half and feeding every 12 hours. "
+            f"Continue discarding half and feeding {cadence}. "
             "Your starter is active when it's bubbly, doubled in size, and floats in water."
         )
 
@@ -176,8 +213,18 @@ class SourdoughCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         elapsed_seconds = max(0, (now - start_dt).total_seconds())
         current_day = int(elapsed_seconds / 86400) + 1
 
-        # Phase details
-        interval_hours, should_discard = _get_phase_for_day(current_day)
+        # Phase details. The maintenance interval is user-configurable so that
+        # fridge-stored, weekly-fed starters (The Sourdough Framework) are
+        # supported alongside the default 12h room-temperature cadence.
+        maintenance_interval_hours = float(
+            cfg.get(
+                CONF_MAINTENANCE_INTERVAL_HOURS,
+                DEFAULT_MAINTENANCE_INTERVAL_HOURS,
+            )
+        )
+        interval_hours, should_discard = _get_phase_for_day(
+            current_day, maintenance_interval_hours
+        )
         phase_label = _phase_label(current_day)
 
         # Last feeding

@@ -11,11 +11,16 @@ from unittest.mock import patch
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.sourdough.const import CONF_VESSEL_TARE, DOMAIN
+from custom_components.sourdough.const import (
+    CONF_MAINTENANCE_INTERVAL_HOURS,
+    CONF_VESSEL_TARE,
+    DOMAIN,
+)
 from custom_components.sourdough.coordinator import (
     SourdoughCoordinator,
     _build_instructions,
     _get_phase_for_day,
+    _humanize_interval,
     _phase_label,
     estimate_starter_weight,
 )
@@ -52,6 +57,32 @@ class TestPhaseForDay:
         assert hours == expected_hours
         assert discard == expected_discard
 
+    @pytest.mark.parametrize("day", [8, 12, 30])
+    def test_maintenance_interval_is_configurable(self, day):
+        """Day 8+ uses the supplied maintenance interval, not a fixed 12h."""
+        hours, discard = _get_phase_for_day(day, maintenance_interval_hours=168)
+        assert hours == 168
+        assert discard is True
+
+    @pytest.mark.parametrize("day", [1, 5, 7])
+    def test_establishment_days_ignore_maintenance_interval(self, day):
+        """Days 1-7 keep their fixed recipe interval regardless of the override."""
+        hours, _ = _get_phase_for_day(day, maintenance_interval_hours=168)
+        assert hours != 168
+
+
+class TestHumanizeInterval:
+    @pytest.mark.parametrize("hours,expected", [
+        (12, "every 12 hours"),
+        (1, "every hour"),
+        (24, "every day"),
+        (48, "every 2 days"),
+        (168, "every week"),
+        (336, "every 2 weeks"),
+    ])
+    def test_phrasing(self, hours, expected):
+        assert _humanize_interval(hours) == expected
+
 
 class TestPhaseLabel:
     @pytest.mark.parametrize("day,expected", [
@@ -86,6 +117,12 @@ class TestBuildInstructions:
     def test_maintenance_mentions_active(self):
         result = _build_instructions(10, True, 12, False, 0)
         assert "active" in result.lower()
+
+    def test_maintenance_reflects_custom_interval(self):
+        """A weekly maintenance interval should read as 'every week'."""
+        result = _build_instructions(10, True, 168, False, 0)
+        assert "every week" in result.lower()
+        assert "12 hours" not in result
 
 
 class TestEstimateStarterWeight:
@@ -196,3 +233,23 @@ class TestComputeState:
             state = coord._compute_state()
         # Default config: 60g flour, 60g water → 100%
         assert state["hydration_pct"] == pytest.approx(100.0)
+
+    async def test_maintenance_uses_configured_interval(self, hass):
+        """On Day 8+, next feeding honours the configured maintenance interval."""
+        last_fed = _NOW - timedelta(hours=24)
+        stored = {
+            "start_datetime": _ts(_NOW - timedelta(days=9)),
+            "feedings": [
+                {"timestamp": _ts(last_fed), "flour_g": 60, "water_g": 60, "discarded_g": 0}
+            ],
+        }
+        config = {**DEFAULT_CONFIG, CONF_MAINTENANCE_INTERVAL_HOURS: 168.0}
+        coord = _make_coord(hass, config=config, stored=stored)
+        with patch(_DT_NOW, return_value=_NOW):
+            state = coord._compute_state()
+        assert state["current_day"] == 10
+        assert state["interval_hours"] == 168.0
+        # Last fed 24h ago + 168h interval → not yet due
+        expected_next = last_fed + timedelta(hours=168)
+        assert state["next_feeding_dt"] == expected_next.isoformat()
+        assert state["is_overdue"] is False

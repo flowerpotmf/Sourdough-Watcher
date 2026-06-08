@@ -12,15 +12,19 @@ from homeassistant.core import callback
 from .const import (
     CONF_DISCARD_RATIO,
     CONF_FLOUR_AMOUNT,
+    CONF_MAINTENANCE_INTERVAL_HOURS,
     CONF_UNIT_SYSTEM,
     CONF_VESSEL_TARE,
     CONF_WATER_AMOUNT,
     DEFAULT_DISCARD_RATIO,
     DEFAULT_FLOUR_GRAMS,
+    DEFAULT_MAINTENANCE_INTERVAL_HOURS,
     DEFAULT_VESSEL_TARE_GRAMS,
     DEFAULT_WATER_GRAMS,
     DOMAIN,
     GRAMS_PER_OZ,
+    MAX_MAINTENANCE_INTERVAL_HOURS,
+    MIN_MAINTENANCE_INTERVAL_HOURS,
     UNIT_IMPERIAL,
     UNIT_METRIC,
 )
@@ -39,6 +43,10 @@ def _schema_for_units(unit_system: str, defaults: dict) -> vol.Schema:
         water_default = defaults.get(CONF_WATER_AMOUNT, DEFAULT_WATER_GRAMS)
         vessel_default = defaults.get(CONF_VESSEL_TARE, DEFAULT_VESSEL_TARE_GRAMS)
 
+    maintenance_default = defaults.get(
+        CONF_MAINTENANCE_INTERVAL_HOURS, DEFAULT_MAINTENANCE_INTERVAL_HOURS
+    )
+
     return vol.Schema(
         {
             vol.Required(CONF_FLOUR_AMOUNT, default=flour_default): vol.Coerce(float),
@@ -46,6 +54,15 @@ def _schema_for_units(unit_system: str, defaults: dict) -> vol.Schema:
             vol.Required(CONF_VESSEL_TARE, default=vessel_default): vol.Coerce(float),
             vol.Required(CONF_DISCARD_RATIO, default=defaults.get(CONF_DISCARD_RATIO, DEFAULT_DISCARD_RATIO)): vol.All(
                 vol.Coerce(float), vol.Range(min=0.1, max=0.9)
+            ),
+            vol.Required(
+                CONF_MAINTENANCE_INTERVAL_HOURS, default=maintenance_default
+            ): vol.All(
+                vol.Coerce(float),
+                vol.Range(
+                    min=MIN_MAINTENANCE_INTERVAL_HOURS,
+                    max=MAX_MAINTENANCE_INTERVAL_HOURS,
+                ),
             ),
         }
     )
@@ -99,6 +116,7 @@ class SourdoughConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             water_g = _to_grams(user_input[CONF_WATER_AMOUNT], self._unit_system)
             vessel_g = _to_grams(user_input[CONF_VESSEL_TARE], self._unit_system)
             discard_ratio = user_input[CONF_DISCARD_RATIO]
+            maintenance_interval = user_input[CONF_MAINTENANCE_INTERVAL_HOURS]
 
             if flour_g <= 0:
                 errors[CONF_FLOUR_AMOUNT] = "flour_must_be_positive"
@@ -116,6 +134,7 @@ class SourdoughConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         CONF_WATER_AMOUNT: round(water_g, 2),
                         CONF_VESSEL_TARE: round(vessel_g, 2),
                         CONF_DISCARD_RATIO: discard_ratio,
+                        CONF_MAINTENANCE_INTERVAL_HOURS: round(maintenance_interval, 2),
                     },
                 )
 
@@ -160,6 +179,7 @@ class SourdoughOptionsFlow(config_entries.OptionsFlow):
             water_g = _to_grams(user_input[CONF_WATER_AMOUNT], unit_system)
             vessel_g = _to_grams(user_input[CONF_VESSEL_TARE], unit_system)
             discard_ratio = user_input[CONF_DISCARD_RATIO]
+            maintenance_interval = user_input[CONF_MAINTENANCE_INTERVAL_HOURS]
 
             if flour_g <= 0:
                 errors[CONF_FLOUR_AMOUNT] = "flour_must_be_positive"
@@ -176,6 +196,7 @@ class SourdoughOptionsFlow(config_entries.OptionsFlow):
                         CONF_WATER_AMOUNT: round(water_g, 2),
                         CONF_VESSEL_TARE: round(vessel_g, 2),
                         CONF_DISCARD_RATIO: discard_ratio,
+                        CONF_MAINTENANCE_INTERVAL_HOURS: round(maintenance_interval, 2),
                     },
                 )
 

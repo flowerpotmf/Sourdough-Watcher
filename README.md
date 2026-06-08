@@ -1,14 +1,15 @@
-# Sourdough Monitor — Home Assistant Integration
-
-Created by [Matt's Baps](https://www.instagram.com/mattsbaps/) — follow along on Instagram for baking inspiration, recipes, and the sourdough journey that inspired this integration.
+# Sourdough Watcher — Home Assistant Integration
 
 A Home Assistant custom integration (installable via HACS) that helps you monitor and manage your sourdough starter. Track feeding schedules, weights, discard amounts, and get plain-text instructions for each stage of the recipe.
+
+> Forked from [Matt's Baps' ha-sourdough](https://github.com/Matts-Baps/ha-sourdough) and customised — most notably with a **configurable maintenance feeding interval** so the integration supports both daily room-temperature feeding and fridge-stored, weekly-fed routines such as Hendrik Kleinwächter's [*The Sourdough Framework*](https://www.the-sourdough-framework.com/).
 
 ---
 
 ## Features
 
-- **Recipe-aware schedule** — automatically tracks Days 1–7+ and switches between 24-hour and 12-hour feeding intervals at the right time.
+- **Recipe-aware schedule** — automatically tracks Days 1–7 and switches between 24-hour and 12-hour feeding intervals at the right time.
+- **Configurable maintenance interval** — once the starter is mature (Day 8+), feed it as often as your routine demands. Keep the default 12h for a room-temperature starter, or set 168h (7 days) for a fridge-stored starter fed weekly. Changeable any time via **Configure**.
 - **Vessel/jar tare tracking** — enter your empty jar weight so the integration can calculate starter-only weight from a scale reading.
 - **Metric & Imperial** — configure in either system; all data is stored in grams and converted for display.
 - **Custom ratios** — override the default flour/water amounts and discard ratio to match your own recipe.
@@ -20,7 +21,7 @@ A Home Assistant custom integration (installable via HACS) that helps you monito
 ## Installation via HACS
 
 1. Open HACS → **Integrations** → click the three-dot menu → **Custom repositories**.
-2. Add `https://github.com/Matts-Baps/ha-sourdough` as an **Integration**.
+2. Add `https://github.com/flowerpotmf/Sourdough-Watcher` as an **Integration**.
 3. Search for **Sourdough Monitor** and install it.
 4. Restart Home Assistant.
 5. Go to **Settings → Devices & Services → Add Integration** and search for **Sourdough Monitor**.
@@ -38,8 +39,23 @@ During setup you will be asked for:
 | Water per feeding | Amount of water added at each feeding | 60 g (¼ cup) |
 | Vessel tare weight | Weight of your empty jar/container | 0 (disabled) |
 | Discard ratio | Fraction discarded before feeding on Day 3+ | 0.5 (50%) |
+| Maintenance feeding interval | How often to feed once mature (Day 8+), in hours | 12 h |
 
 All of these can be changed later via **Configure** on the integration card.
+
+### Maintenance feeding interval
+
+For the first week the schedule is fixed by the establishment recipe (Days 1–7).
+From **Day 8** onward the starter is "mature" and the **maintenance feeding
+interval** takes over. This is fully configurable (1–720 hours):
+
+- **12 h** (default) — a starter kept at room temperature and fed twice a day.
+- **24 h** — once-daily room-temperature feeding.
+- **168 h** — a fridge-stored starter fed **once a week**, as recommended by
+  Hendrik Kleinwächter's *The Sourdough Framework*.
+
+The `Next Feeding Due` sensor, overdue logic, and instructions all follow this
+value, so weekly feeders no longer get spurious "feeding overdue" alerts.
 
 ---
 
@@ -243,7 +259,11 @@ The default schedule follows this recipe:
 | 1–2  | 24 h     | No       | Mix flour + water |
 | 3–5  | 24 h     | Yes (50%)| Discard half, then feed |
 | 6–7  | 12 h     | Yes (50%)| Discard half, then feed twice per day |
-| 8+   | 12 h     | Yes (50%)| Maintenance — continue until active |
+| 8+   | **Configurable** (default 12 h) | Yes (50%)| Maintenance — feed on your chosen interval |
+
+The Day 8+ interval is set by the **maintenance feeding interval** option (see
+[Configuration](#maintenance-feeding-interval)). Set it to 168 h for a
+fridge-stored, weekly-fed starter.
 
 **Signs your starter is active:** bubbly, doubled or tripled in size, and floats in water.
 
@@ -274,7 +294,7 @@ The default feeding schedule is based on the sourdough starter recipe by
 
 ## Contributing
 
-Issues and pull requests welcome at `https://github.com/Matts-Baps/ha-sourdough`.
+Issues and pull requests welcome at `https://github.com/flowerpotmf/Sourdough-Watcher`.
 
 ---
 
