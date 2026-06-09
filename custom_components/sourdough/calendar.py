@@ -69,6 +69,23 @@ class SourdoughCalendar(CoordinatorEntity[SourdoughCoordinator], CalendarEntity)
         )
 
     @staticmethod
+    def _peak_event(peak: dict) -> CalendarEvent | None:
+        start = dt_util.parse_datetime(peak.get("timestamp", ""))
+        if start is None:
+            return None
+        rise = peak.get("rise_hours")
+        if rise is not None:
+            description = f"Starter peaked {rise:g} h after feeding."
+        else:
+            description = "Starter reached its peak."
+        return CalendarEvent(
+            start=start,
+            end=start + EVENT_DURATION,
+            summary="Starter peaked",
+            description=description,
+        )
+
+    @staticmethod
     def _feeding_event(feeding: dict) -> CalendarEvent | None:
         start = dt_util.parse_datetime(feeding.get("timestamp", ""))
         if start is None:
@@ -107,6 +124,11 @@ class SourdoughCalendar(CoordinatorEntity[SourdoughCoordinator], CalendarEntity)
 
         for feeding in self.coordinator.feedings:
             event = self._feeding_event(feeding)
+            if event and start_date <= event.start <= end_date:
+                events.append(event)
+
+        for peak in self.coordinator.peaks:
+            event = self._peak_event(peak)
             if event and start_date <= event.start <= end_date:
                 events.append(event)
 

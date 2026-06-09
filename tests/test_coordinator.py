@@ -25,6 +25,7 @@ from custom_components.sourdough.coordinator import (
     _humanize_interval,
     _phase_label,
     estimate_starter_weight,
+    rise_hours_for_peak,
 )
 
 from .conftest import DEFAULT_CONFIG
@@ -132,6 +133,37 @@ class TestBuildInstructions:
         result = _build_instructions(10, True, 168, False, 0)
         assert "every week" in result.lower()
         assert "12 hours" not in result
+
+    def test_maintenance_without_discard_does_not_say_discard_half(self):
+        """With maintenance discard off, instructions must not tell you to discard half."""
+        result = _build_instructions(10, False, 168, False, 0)
+        assert "discarding half" not in result.lower()
+        assert "no discard" in result.lower()
+        assert "active" in result.lower()
+
+
+class TestRiseHoursForPeak:
+    def test_none_when_no_prior_feeding(self):
+        assert rise_hours_for_peak([], _NOW) is None
+
+    def test_hours_since_last_feeding(self):
+        feedings = [{"timestamp": _ts(_NOW - timedelta(hours=5))}]
+        assert rise_hours_for_peak(feedings, _NOW) == pytest.approx(5.0)
+
+    def test_uses_most_recent_feeding_before_peak(self):
+        feedings = [
+            {"timestamp": _ts(_NOW - timedelta(hours=30))},
+            {"timestamp": _ts(_NOW - timedelta(hours=6))},
+        ]
+        assert rise_hours_for_peak(feedings, _NOW) == pytest.approx(6.0)
+
+    def test_ignores_feedings_after_the_peak(self):
+        peak = _NOW - timedelta(hours=2)
+        feedings = [
+            {"timestamp": _ts(_NOW - timedelta(hours=8))},  # 6h before the peak
+            {"timestamp": _ts(_NOW)},  # after the peak — must be ignored
+        ]
+        assert rise_hours_for_peak(feedings, peak) == pytest.approx(6.0)
 
 
 class TestEstimateStarterWeight:
@@ -279,6 +311,53 @@ class TestComputeState:
         assert state["phase"] == "Maintenance"
         assert state["should_discard"] is False
         assert state["discard_amount_g"] == 0.0
+
+    async def test_starter_metadata_defaults_in_state(self, hass):
+        """Starter type and flour type fall back to sensible defaults."""
+        coord = _make_coord(hass)
+        with patch(_DT_NOW, return_value=_NOW):
+            state = coord._compute_state()
+        assert state["starter_type"] == "liquid"
+        assert state["flour_type"] == "wheat"
+
+    async def test_log_peak_records_rise_time(self, hass):
+        """Logging a peak stores its rise time (hours since the last feeding)."""
+        last_fed = _NOW - timedelta(hours=6)
+        stored = {
+            "start_datetime": _ts(_NOW - timedelta(days=9)),
+            "feedings": [
+                {"timestamp": _ts(last_fed), "flour_g": 60, "water_g": 60, "discarded_g": 0}
+            ],
+        }
+        coord = _make_coord(hass, stored=stored)
+        coord._store.async_save = AsyncMock()
+        with patch(_DT_NOW, return_value=_NOW):
+            await coord.async_log_peak()
+            state = coord._compute_state()
+        assert state["peak_count"] == 1
+        assert state["last_rise_hours"] == pytest.approx(6.0)
+        assert state["average_rise_hours"] == pytest.approx(6.0)
+        assert state["last_peak_dt"] == _NOW.isoformat()
+        assert coord._store.async_save.await_count == 1
+
+    async def test_log_peak_backdated_timestamp(self, hass):
+        """A peak can be logged with a past timestamp (logged after the fact)."""
+        last_fed = _NOW - timedelta(hours=10)
+        peak_time = _NOW - timedelta(hours=2)
+        stored = {
+            "start_datetime": _ts(_NOW - timedelta(days=9)),
+            "feedings": [
+                {"timestamp": _ts(last_fed), "flour_g": 60, "water_g": 60, "discarded_g": 0}
+            ],
+        }
+        coord = _make_coord(hass, stored=stored)
+        coord._store.async_save = AsyncMock()
+        with patch(_DT_NOW, return_value=_NOW):
+            await coord.async_log_peak(timestamp=peak_time)
+            state = coord._compute_state()
+        # Peak 2h ago, fed 10h ago → 8h rise time.
+        assert state["last_rise_hours"] == pytest.approx(8.0)
+        assert state["last_peak_dt"] == peak_time.isoformat()
 
     async def test_skip_feeding_pushes_next_due_by_one_interval(self, hass):
         """Skipping advances the next-feeding time by one interval, no feeding logged."""

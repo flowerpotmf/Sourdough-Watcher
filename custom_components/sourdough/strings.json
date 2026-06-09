@@ -3,9 +3,13 @@
     "step": {
       "user": {
         "title": "Sourdough Monitor Setup",
-        "description": "Choose your preferred unit system. All values are stored in grams internally and converted for display.",
+        "description": "Name this starter and choose your preferred unit system. All values are stored in grams internally and converted for display.",
         "data": {
+          "name": "Starter name",
           "unit_system": "Unit System"
+        },
+        "data_description": {
+          "name": "A name for this starter, e.g. \"Rye Starter\". Used as the device name so multiple starters can be told apart."
         }
       },
       "amounts": {
@@ -17,11 +21,15 @@
           "vessel_tare_g": "Empty vessel / jar weight (0 to skip)",
           "discard_ratio": "Discard ratio (0.5 = discard half)",
           "maintenance_interval_hours": "Maintenance feeding interval (hours)",
-          "maintenance_discard": "Discard during maintenance"
+          "maintenance_discard": "Discard during maintenance",
+          "starter_type": "Starter type",
+          "flour_type": "Flour type"
         },
         "data_description": {
           "maintenance_interval_hours": "How often to feed once the starter is mature (Day 8+). Use 12 for a room-temperature starter, or 168 (7 days) for a fridge-stored, weekly-fed starter as in The Sourdough Framework.",
-          "maintenance_discard": "Whether to discard part of the starter before each maintenance feeding. Turn off if you keep a small amount instead of discarding (common for fridge-stored, weekly routines)."
+          "maintenance_discard": "Whether to discard part of the starter before each maintenance feeding. Turn off if you keep a small amount instead of discarding (common for fridge-stored, weekly routines).",
+          "starter_type": "Liquid (≈100% hydration) or stiff (≈50-60%, better suited to fridge storage). Descriptive only — hydration is calculated from the flour and water amounts above.",
+          "flour_type": "The flour this starter is maintained on. Descriptive only."
         }
       }
     },
@@ -41,11 +49,15 @@
           "vessel_tare_g": "Empty vessel / jar weight (0 to skip)",
           "discard_ratio": "Discard ratio (0.5 = discard half)",
           "maintenance_interval_hours": "Maintenance feeding interval (hours)",
-          "maintenance_discard": "Discard during maintenance"
+          "maintenance_discard": "Discard during maintenance",
+          "starter_type": "Starter type",
+          "flour_type": "Flour type"
         },
         "data_description": {
           "maintenance_interval_hours": "How often to feed once the starter is mature (Day 8+). Use 12 for a room-temperature starter, or 168 (7 days) for a fridge-stored, weekly-fed starter as in The Sourdough Framework.",
-          "maintenance_discard": "Whether to discard part of the starter before each maintenance feeding. Turn off if you keep a small amount instead of discarding (common for fridge-stored, weekly routines)."
+          "maintenance_discard": "Whether to discard part of the starter before each maintenance feeding. Turn off if you keep a small amount instead of discarding (common for fridge-stored, weekly routines).",
+          "starter_type": "Liquid (≈100% hydration) or stiff (≈50-60%, better suited to fridge storage). Descriptive only.",
+          "flour_type": "The flour this starter is maintained on. Descriptive only."
         }
       }
     },
@@ -67,6 +79,10 @@
     "reset_process": {
       "name": "Reset Process",
       "description": "Reset the sourdough process to Day 1."
+    },
+    "log_peak": {
+      "name": "Log Peak",
+      "description": "Record that the starter has reached its peak (fully risen) and store the rise time since the last feeding."
     }
   }
 }
