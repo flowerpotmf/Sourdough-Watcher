@@ -7,7 +7,6 @@ DOMAIN = "sourdough"
 VERSION: str = json.loads(
     (Path(__file__).parent / "manifest.json").read_text()
 )["version"]
-PLATFORMS = ["sensor"]
 
 # Storage
 STORAGE_KEY = f"{DOMAIN}.data"
@@ -52,6 +51,37 @@ MAX_MAINTENANCE_INTERVAL_HOURS = 720.0  # 30 days
 # set this to False to drop the discard step (and its alerts) in maintenance.
 DEFAULT_MAINTENANCE_DISCARD = True
 
+# Default name for a starter. Used as the config entry title and the device
+# name so that multiple starters (e.g. a wheat and a rye starter) can each be
+# given a distinct, recognisable name.
+DEFAULT_NAME = "Sourdough Starter"
+
+# Starter consistency. Liquid starters are typically kept at 100% hydration;
+# stiff starters (favoured for fridge storage in The Sourdough Framework) sit
+# around 50-60% and tolerate longer gaps between feedings. The value is
+# descriptive metadata — the actual hydration is always derived from the
+# configured flour/water amounts.
+STARTER_TYPE_LIQUID = "liquid"
+STARTER_TYPE_STIFF = "stiff"
+STARTER_TYPE_CUSTOM = "custom"
+STARTER_TYPES = {
+    STARTER_TYPE_LIQUID: "Liquid (≈100% hydration)",
+    STARTER_TYPE_STIFF: "Stiff (≈50-60% hydration)",
+    STARTER_TYPE_CUSTOM: "Custom",
+}
+DEFAULT_STARTER_TYPE = STARTER_TYPE_LIQUID
+
+# Flour the starter is maintained on. Purely descriptive; lets a rye starter
+# and a wheat starter be told apart at a glance.
+FLOUR_TYPES = {
+    "wheat": "Wheat / White",
+    "whole_wheat": "Whole Wheat",
+    "rye": "Rye",
+    "spelt": "Spelt",
+    "other": "Other",
+}
+DEFAULT_FLOUR_TYPE = "wheat"
+
 # Convenience presets surfaced by the "Maintenance cadence" select entity,
 # mapping a human label to an interval in hours.
 MAINTENANCE_PRESETS = {
@@ -71,6 +101,7 @@ RECIPE_PHASES = [
 ]
 
 # Configuration keys
+CONF_NAME = "name"
 CONF_VESSEL_TARE = "vessel_tare_g"
 CONF_FLOUR_AMOUNT = "flour_g"
 CONF_WATER_AMOUNT = "water_g"
@@ -79,6 +110,8 @@ CONF_UNIT_SYSTEM = "unit_system"
 CONF_START_DATETIME = "start_datetime"
 CONF_MAINTENANCE_INTERVAL_HOURS = "maintenance_interval_hours"
 CONF_MAINTENANCE_DISCARD = "maintenance_discard"
+CONF_STARTER_TYPE = "starter_type"
+CONF_FLOUR_TYPE = "flour_type"
 
 # Service names
 SERVICE_RECORD_FEEDING = "record_feeding"
@@ -86,6 +119,7 @@ SERVICE_RESET = "reset_process"
 SERVICE_SET_DAY = "set_day"
 SERVICE_SET_WEIGHT = "set_weight"
 SERVICE_SKIP_FEEDING = "skip_feeding"
+SERVICE_LOG_PEAK = "log_peak"
 
 # Sensor unique ID suffixes
 SENSOR_DAY = "day"
@@ -101,3 +135,6 @@ SENSOR_DISCARD_AMOUNT = "discard_amount"
 SENSOR_INSTRUCTIONS = "instructions"
 SENSOR_FEEDING_COUNT = "feeding_count"
 SENSOR_HYDRATION = "hydration"
+SENSOR_LAST_PEAK = "last_peak"
+SENSOR_RISE_TIME = "rise_time"
+SENSOR_AVG_RISE_TIME = "avg_rise_time"

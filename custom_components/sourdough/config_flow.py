@@ -12,21 +12,29 @@ from homeassistant.core import callback
 from .const import (
     CONF_DISCARD_RATIO,
     CONF_FLOUR_AMOUNT,
+    CONF_FLOUR_TYPE,
     CONF_MAINTENANCE_DISCARD,
     CONF_MAINTENANCE_INTERVAL_HOURS,
+    CONF_NAME,
+    CONF_STARTER_TYPE,
     CONF_UNIT_SYSTEM,
     CONF_VESSEL_TARE,
     CONF_WATER_AMOUNT,
     DEFAULT_DISCARD_RATIO,
     DEFAULT_FLOUR_GRAMS,
+    DEFAULT_FLOUR_TYPE,
     DEFAULT_MAINTENANCE_DISCARD,
     DEFAULT_MAINTENANCE_INTERVAL_HOURS,
+    DEFAULT_NAME,
+    DEFAULT_STARTER_TYPE,
     DEFAULT_VESSEL_TARE_GRAMS,
     DEFAULT_WATER_GRAMS,
     DOMAIN,
+    FLOUR_TYPES,
     GRAMS_PER_OZ,
     MAX_MAINTENANCE_INTERVAL_HOURS,
     MIN_MAINTENANCE_INTERVAL_HOURS,
+    STARTER_TYPES,
     UNIT_IMPERIAL,
     UNIT_METRIC,
 )
@@ -51,6 +59,8 @@ def _schema_for_units(unit_system: str, defaults: dict) -> vol.Schema:
     maintenance_discard_default = defaults.get(
         CONF_MAINTENANCE_DISCARD, DEFAULT_MAINTENANCE_DISCARD
     )
+    starter_type_default = defaults.get(CONF_STARTER_TYPE, DEFAULT_STARTER_TYPE)
+    flour_type_default = defaults.get(CONF_FLOUR_TYPE, DEFAULT_FLOUR_TYPE)
 
     return vol.Schema(
         {
@@ -72,6 +82,12 @@ def _schema_for_units(unit_system: str, defaults: dict) -> vol.Schema:
             vol.Required(
                 CONF_MAINTENANCE_DISCARD, default=maintenance_discard_default
             ): bool,
+            vol.Required(
+                CONF_STARTER_TYPE, default=starter_type_default
+            ): vol.In(STARTER_TYPES),
+            vol.Required(
+                CONF_FLOUR_TYPE, default=flour_type_default
+            ): vol.In(FLOUR_TYPES),
         }
     )
 
@@ -90,12 +106,14 @@ class SourdoughConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     def __init__(self) -> None:
         self._unit_system: str = UNIT_METRIC
+        self._name: str = DEFAULT_NAME
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> config_entries.FlowResult:
-        """Step 1: choose unit system."""
+        """Step 1: name the starter and choose the unit system."""
         if user_input is not None:
+            self._name = (user_input.get(CONF_NAME) or DEFAULT_NAME).strip() or DEFAULT_NAME
             self._unit_system = user_input[CONF_UNIT_SYSTEM]
             return await self.async_step_amounts()
 
@@ -103,6 +121,7 @@ class SourdoughConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="user",
             data_schema=vol.Schema(
                 {
+                    vol.Required(CONF_NAME, default=DEFAULT_NAME): str,
                     vol.Required(CONF_UNIT_SYSTEM, default=UNIT_METRIC): vol.In(
                         {UNIT_METRIC: "Metric (grams)", UNIT_IMPERIAL: "Imperial (oz)"}
                     ),
@@ -136,8 +155,9 @@ class SourdoughConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
             if not errors:
                 return self.async_create_entry(
-                    title="Sourdough Starter",
+                    title=self._name,
                     data={
+                        CONF_NAME: self._name,
                         CONF_UNIT_SYSTEM: self._unit_system,
                         CONF_FLOUR_AMOUNT: round(flour_g, 2),
                         CONF_WATER_AMOUNT: round(water_g, 2),
@@ -145,6 +165,8 @@ class SourdoughConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         CONF_DISCARD_RATIO: discard_ratio,
                         CONF_MAINTENANCE_INTERVAL_HOURS: round(maintenance_interval, 2),
                         CONF_MAINTENANCE_DISCARD: maintenance_discard,
+                        CONF_STARTER_TYPE: user_input[CONF_STARTER_TYPE],
+                        CONF_FLOUR_TYPE: user_input[CONF_FLOUR_TYPE],
                     },
                 )
 
@@ -209,6 +231,8 @@ class SourdoughOptionsFlow(config_entries.OptionsFlow):
                         CONF_DISCARD_RATIO: discard_ratio,
                         CONF_MAINTENANCE_INTERVAL_HOURS: round(maintenance_interval, 2),
                         CONF_MAINTENANCE_DISCARD: maintenance_discard,
+                        CONF_STARTER_TYPE: user_input[CONF_STARTER_TYPE],
+                        CONF_FLOUR_TYPE: user_input[CONF_FLOUR_TYPE],
                     },
                 )
 

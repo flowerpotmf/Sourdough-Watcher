@@ -30,6 +30,7 @@ async def async_setup_entry(
 
     async_add_entities([
         SourdoughRecordFeedingButton(coordinator, entry),
+        SourdoughLogPeakButton(coordinator, entry),
         SourdoughSkipFeedingButton(coordinator, entry),
         SourdoughResetButton(coordinator, entry),
     ])
@@ -57,6 +58,29 @@ class SourdoughRecordFeedingButton(
         data = self.coordinator.data or {}
         discarded_g = data.get("discard_amount_g", 0.0) if data.get("should_discard") else 0.0
         await self.coordinator.async_record_feeding(discarded_g=discarded_g)
+
+
+class SourdoughLogPeakButton(
+    CoordinatorEntity[SourdoughCoordinator], ButtonEntity
+):
+    """Log that the starter has just reached its peak (fully risen).
+
+    Records the rise time (hours since the last feeding) so you can track how
+    lively the starter is over time. To log a peak that happened earlier, use
+    the ``sourdough.log_peak`` service with a ``timestamp`` instead.
+    """
+
+    _attr_has_entity_name = True
+    _attr_name = "Log Peak"
+    _attr_icon = "mdi:arrow-up-bold-circle-outline"
+
+    def __init__(self, coordinator: SourdoughCoordinator, entry: ConfigEntry) -> None:
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{entry.entry_id}_log_peak"
+        self._attr_device_info = _device_info(entry)
+
+    async def async_press(self) -> None:
+        await self.coordinator.async_log_peak()
 
 
 class SourdoughSkipFeedingButton(

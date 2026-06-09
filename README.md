@@ -12,13 +12,16 @@ A Home Assistant custom integration (installable via HACS) that helps you monito
 - **Configurable maintenance interval** — once the starter is mature (Day 8+), feed it as often as your routine demands. Keep the default 12h for a room-temperature starter, or set 168h (7 days) for a fridge-stored starter fed weekly. Changeable any time via **Configure**, or switch presets straight from the dashboard with the **Maintenance Cadence** selector.
 - **Optional maintenance discard** — turn discarding off during maintenance (via the **Discard During Maintenance** switch or options) if you keep a small amount of starter instead, as fridge/weekly routines often do.
 - **"Feeding Due" binary sensor** — a ready-made `binary_sensor` (device class *problem*) so notifications and dashboards don't need to template attributes.
+- **Peak / rise-time tracking** — log when the starter peaks (via the **Log Peak** button or the `sourdough.log_peak` service, which can be back-dated) and the integration records how long it took to rise since the last feeding. **Last Rise Time** and **Average Rise Time** sensors keep long-term history so you can watch how lively your starter is over time.
+- **Starter & flour type** — tag each starter as **liquid** or **stiff** (per *The Sourdough Framework*) and record the flour it's maintained on (wheat, rye, spelt…). Descriptive metadata that makes multiple starters easy to tell apart.
+- **Multiple starters** — add the integration more than once to track several starters (e.g. a wheat and a rye starter) side by side; each gets its own name, device, entities, and history.
 - **Skip / snooze** — a **Skip Feeding** button (and `sourdough.skip_feeding` service) pushes the next feeding forward one interval without logging a feeding.
-- **Feeding calendar** — past feedings and the next due feeding appear as a Home Assistant calendar entity.
+- **Feeding calendar** — past feedings, logged peaks, and the next due feeding appear as a Home Assistant calendar entity.
 - **Vessel/jar tare tracking** — enter your empty jar weight so the integration can calculate starter-only weight from a scale reading.
 - **Metric & Imperial** — configure in either system; all data is stored in grams and converted for display.
 - **Custom ratios** — override the default flour/water amounts and discard ratio to match your own recipe.
 - **Persistent storage** — feeding history survives Home Assistant restarts.
-- **Services** — record feedings, skip a feeding, and reset the process from automations or the UI.
+- **Services** — record feedings, log a peak, skip a feeding, and reset the process from automations or the UI.
 
 ---
 
@@ -30,6 +33,12 @@ A Home Assistant custom integration (installable via HACS) that helps you monito
 4. Restart Home Assistant.
 5. Go to **Settings → Devices & Services → Add Integration** and search for **Sourdough Monitor**.
 
+### Updating
+
+New versions are published as GitHub releases. When one is available, HACS shows
+an update for **Sourdough Monitor** and it appears under **Settings → Updates** in
+Home Assistant — update from there and restart. No manual file copying required.
+
 ---
 
 ## Configuration
@@ -38,6 +47,7 @@ During setup you will be asked for:
 
 | Field | Description | Default |
 |-------|-------------|---------|
+| Starter name | A name for this starter (e.g. "Rye Starter"); used as the device name | Sourdough Starter |
 | Unit System | Metric (g) or Imperial (oz) for display | Metric |
 | Flour per feeding | Amount of flour added at each feeding | 60 g (½ cup) |
 | Water per feeding | Amount of water added at each feeding | 60 g (¼ cup) |
@@ -45,8 +55,14 @@ During setup you will be asked for:
 | Discard ratio | Fraction discarded before feeding on Day 3+ | 0.5 (50%) |
 | Maintenance feeding interval | How often to feed once mature (Day 8+), in hours | 12 h |
 | Discard during maintenance | Whether to discard before each maintenance feeding | On |
+| Starter type | Liquid (≈100% hydration) or stiff (≈50-60%) — descriptive | Liquid |
+| Flour type | Wheat, whole wheat, rye, spelt… — descriptive | Wheat / White |
 
-All of these can be changed later via **Configure** on the integration card.
+Everything except the name can be changed later via **Configure** on the integration card.
+
+### Tracking multiple starters
+
+Keep more than one starter (e.g. a wheat and a rye starter)? Just **Add Integration → Sourdough Monitor** again and give it a different name. Each entry becomes its own device with its own entities and feeding/peak history. Services accept an optional `entry_id` to target a specific starter.
 
 ### Maintenance feeding interval
 
@@ -61,6 +77,17 @@ interval** takes over. This is fully configurable (1–720 hours):
 
 The `Next Feeding Due` sensor, overdue logic, and instructions all follow this
 value, so weekly feeders no longer get spurious "feeding overdue" alerts.
+
+### Peak / rise-time tracking
+
+When your starter has fully risen ("peaked"), tap the **Log Peak** button or call
+`sourdough.log_peak`. The integration measures the **rise time** — the hours
+between the most recent feeding and the peak — and stores it. The
+`sensor.sourdough_last_rise_time` and `sensor.sourdough_average_rise_time` sensors
+expose this with long-term statistics, so you can chart how your starter's vigour
+changes with temperature, flour, or season. Missed the exact moment? Call the
+service with a `timestamp` to back-date the peak. Logged peaks also appear on the
+feeding calendar.
 
 ---
 
@@ -78,11 +105,14 @@ value, so weekly feeders no longer get spurious "feeding overdue" alerts.
 | `sensor.sourdough_flour_to_add` | Flour amount for the next feeding |
 | `sensor.sourdough_water_to_add` | Water amount for the next feeding |
 | `sensor.sourdough_discard_amount` | How much starter to discard before feeding |
-| `sensor.sourdough_hydration` | Water/flour ratio as a percentage |
+| `sensor.sourdough_hydration` | Water/flour ratio as a percentage (with `starter_type` / `flour_type` attributes) |
 | `sensor.sourdough_total_feedings` | Count of feedings recorded |
+| `sensor.sourdough_last_peak` | Timestamp of the most recent logged peak |
+| `sensor.sourdough_last_rise_time` | Rise time (hours) of the most recent peak — long-term history enabled |
+| `sensor.sourdough_average_rise_time` | Average rise time across all logged peaks |
 | `sensor.sourdough_instructions` | Plain-text instructions for the current step |
 
-Weight sensors include both grams and ounces as extra attributes, regardless of the configured unit system. Flour/water sensors also include a `volume_hint` attribute (e.g., `"1/2 cup"`) for convenience.
+Weight sensors include both grams and ounces as extra attributes, regardless of the configured unit system. Flour/water sensors also include a `volume_hint` attribute (e.g., `"1/2 cup"`) for convenience. The rise-time sensors carry the `measurement` state class, so Home Assistant keeps long-term statistics you can graph with a History or Statistics card.
 
 ### Other entities
 
@@ -92,11 +122,12 @@ Weight sensors include both grams and ounces as extra attributes, regardless of 
 | `select.sourdough_maintenance_cadence` | Quick preset switch for the Day 8+ interval (12h / 24h / 48h / weekly) |
 | `switch.sourdough_discard_during_maintenance` | Toggle discarding during the maintenance phase |
 | `button.sourdough_record_feeding` | Record a feeding using the configured amounts |
+| `button.sourdough_log_peak` | Log that the starter has reached its peak (records rise time) |
 | `button.sourdough_skip_feeding` | Skip (snooze) the next feeding by one interval |
 | `button.sourdough_reset_process` | Reset the process back to Day 1 |
 | `number.sourdough_current_day` | Set the current recipe day (for mid-recipe setup) |
 | `number.sourdough_current_weight_with_vessel` | Record the measured weight as a baseline |
-| `calendar.sourdough_feeding_schedule` | Past feedings and the next due feeding |
+| `calendar.sourdough_feeding_schedule` | Past feedings, logged peaks, and the next due feeding |
 
 ---
 
@@ -113,6 +144,20 @@ data:
   flour: 60       # grams (or oz if configured for imperial)
   water: 60       # grams (or oz if configured for imperial)
   discarded: 60   # grams (or oz) — omit on Days 1 & 2
+```
+
+### `sourdough.log_peak`
+
+Record that the starter has reached its peak (fully risen). The rise time —
+hours since the last feeding — is calculated and stored, building a history of
+how quickly your starter rises. Provide a `timestamp` to log a peak you noticed
+after the fact (so you don't have to catch the exact moment).
+
+```yaml
+service: sourdough.log_peak
+data:
+  # Optional — omit to log "now". Back-date if you noticed it had already peaked.
+  timestamp: "2026-03-08 14:30:00"
 ```
 
 ### `sourdough.skip_feeding`
