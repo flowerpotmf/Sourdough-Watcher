@@ -20,8 +20,10 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
+    CONF_NAME,
     CONF_UNIT_SYSTEM,
     DOMAIN,
+    SENSOR_AVG_RISE_TIME,
     SENSOR_DAY,
     SENSOR_DISCARD_AMOUNT,
     SENSOR_FEEDING_COUNT,
@@ -29,8 +31,10 @@ from .const import (
     SENSOR_HYDRATION,
     SENSOR_INSTRUCTIONS,
     SENSOR_LAST_FED,
+    SENSOR_LAST_PEAK,
     SENSOR_NEXT_FEEDING,
     SENSOR_PHASE,
+    SENSOR_RISE_TIME,
     SENSOR_STARTER_WEIGHT,
     SENSOR_TOTAL_WEIGHT,
     SENSOR_VESSEL_TARE,
@@ -107,15 +111,36 @@ async def async_setup_entry(
         SourdoughHydrationSensor(coordinator, entry, unit_system),
         SourdoughFeedingCountSensor(coordinator, entry, unit_system),
         SourdoughInstructionsSensor(coordinator, entry, unit_system),
+        SourdoughLastPeakSensor(coordinator, entry, unit_system),
+        SourdoughRiseTimeSensor(
+            coordinator, entry, unit_system,
+            key=SENSOR_RISE_TIME,
+            name="Last Rise Time",
+            data_key="last_rise_hours",
+            icon="mdi:trending-up",
+        ),
+        SourdoughRiseTimeSensor(
+            coordinator, entry, unit_system,
+            key=SENSOR_AVG_RISE_TIME,
+            name="Average Rise Time",
+            data_key="average_rise_hours",
+            icon="mdi:chart-bell-curve",
+        ),
     ]
 
     async_add_entities(entities)
 
 
 def _device_info(entry: ConfigEntry) -> DeviceInfo:
+    # Prefer the user-supplied name (set when adding the integration) so that
+    # multiple starters — e.g. a wheat and a rye starter — get distinct device
+    # names. Falls back to the original fixed name for entries created before
+    # naming was supported.
+    cfg = {**entry.data, **(entry.options or {})}
+    name = cfg.get(CONF_NAME) or "Sourdough Monitor"
     return DeviceInfo(
         identifiers={(DOMAIN, entry.entry_id)},
-        name="Sourdough Monitor",
+        name=name,
         manufacturer="Matt's Baps",
         model="Sourdough Starter Tracker",
         sw_version=VERSION,
@@ -307,6 +332,8 @@ class SourdoughHydrationSensor(SourdoughBaseSensor):
         return {
             "flour_g": data.get("flour_g"),
             "water_g": data.get("water_g"),
+            "starter_type": data.get("starter_type"),
+            "flour_type": data.get("flour_type"),
         }
 
 
@@ -346,3 +373,44 @@ class SourdoughInstructionsSensor(SourdoughBaseSensor):
             "flour_to_add_g": data.get("flour_g"),
             "water_to_add_g": data.get("water_g"),
         }
+
+
+class SourdoughLastPeakSensor(SourdoughBaseSensor):
+    """Timestamp of the most recently logged peak (fully risen) event."""
+
+    def __init__(self, coordinator, entry, unit_system):
+        super().__init__(coordinator, entry, unit_system, SENSOR_LAST_PEAK, "Last Peak", "mdi:arrow-up-bold-circle-outline")
+        self._attr_device_class = SensorDeviceClass.TIMESTAMP
+
+    @property
+    def native_value(self) -> datetime | None:
+        raw = self._data.get("last_peak_dt")
+        if raw:
+            return dt_util.parse_datetime(raw)
+        return None
+
+    @property
+    def extra_state_attributes(self):
+        data = self._data
+        return {
+            "rise_hours": data.get("last_rise_hours"),
+            "peak_count": data.get("peak_count"),
+        }
+
+
+class SourdoughRiseTimeSensor(SourdoughBaseSensor):
+    """Rise time in hours (last or average), recorded for long-term history."""
+
+    def __init__(self, coordinator, entry, unit_system, key, name, data_key, icon):
+        super().__init__(coordinator, entry, unit_system, key, name, icon)
+        self._data_key = data_key
+        self._attr_state_class = SensorStateClass.MEASUREMENT
+        self._attr_native_unit_of_measurement = "h"
+
+    @property
+    def native_value(self) -> float | None:
+        return self._data.get(self._data_key)
+
+    @property
+    def extra_state_attributes(self):
+        return {"peak_count": self._data.get("peak_count")}

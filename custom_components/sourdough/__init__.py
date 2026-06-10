@@ -14,6 +14,7 @@ from .const import (
     CONF_UNIT_SYSTEM,
     DOMAIN,
     GRAMS_PER_OZ,
+    SERVICE_LOG_PEAK,
     SERVICE_RECORD_FEEDING,
     SERVICE_RESET,
     SERVICE_SET_DAY,
@@ -65,6 +66,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             hass.services.async_remove(DOMAIN, SERVICE_SET_DAY)
             hass.services.async_remove(DOMAIN, SERVICE_SET_WEIGHT)
             hass.services.async_remove(DOMAIN, SERVICE_SKIP_FEEDING)
+            hass.services.async_remove(DOMAIN, SERVICE_LOG_PEAK)
     return unload_ok
 
 
@@ -242,4 +244,28 @@ def _register_services(
             SERVICE_SKIP_FEEDING,
             handle_skip_feeding,
             schema=skip_schema,
+        )
+
+    # Service: log_peak
+    log_peak_schema = vol.Schema(
+        {
+            vol.Optional("entry_id"): cv.string,
+            vol.Optional("timestamp"): cv.datetime,
+        }
+    )
+
+    async def handle_log_peak(call: ServiceCall) -> None:
+        target_entry_id = call.data.get("entry_id", entry.entry_id)
+        target_coordinator: SourdoughCoordinator = hass.data[DOMAIN].get(target_entry_id)
+        if target_coordinator is None:
+            _LOGGER.error("No sourdough entry found with id: %s", target_entry_id)
+            return
+        await target_coordinator.async_log_peak(timestamp=call.data.get("timestamp"))
+
+    if not hass.services.has_service(DOMAIN, SERVICE_LOG_PEAK):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_LOG_PEAK,
+            handle_log_peak,
+            schema=log_peak_schema,
         )

@@ -15,14 +15,18 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from .const import (
     CONF_DISCARD_RATIO,
     CONF_FLOUR_AMOUNT,
+    CONF_FLOUR_TYPE,
     CONF_MAINTENANCE_DISCARD,
     CONF_MAINTENANCE_INTERVAL_HOURS,
+    CONF_STARTER_TYPE,
     CONF_VESSEL_TARE,
     CONF_WATER_AMOUNT,
     DEFAULT_DISCARD_RATIO,
     DEFAULT_FLOUR_GRAMS,
+    DEFAULT_FLOUR_TYPE,
     DEFAULT_MAINTENANCE_DISCARD,
     DEFAULT_MAINTENANCE_INTERVAL_HOURS,
+    DEFAULT_STARTER_TYPE,
     DEFAULT_VESSEL_TARE_GRAMS,
     DEFAULT_WATER_GRAMS,
     DOMAIN,
@@ -112,12 +116,39 @@ def _build_instructions(day: int, should_discard: bool, interval_hours: int, is_
         action = "Discard half the starter, then add flour and water. Feed every 12 hours."
     else:
         cadence = _humanize_interval(interval_hours)
+        if should_discard:
+            feeding_step = f"Continue discarding half and feeding {cadence}. "
+        else:
+            feeding_step = (
+                f"Feed {cadence} — no discard; keep a small amount of starter "
+                "and refresh it with flour and water. "
+            )
         action = (
-            f"Continue discarding half and feeding {cadence}. "
-            "Your starter is active when it's bubbly, doubled in size, and floats in water."
+            feeding_step
+            + "Your starter is active when it's bubbly, doubled in size, and floats in water."
         )
 
     return urgency + action
+
+
+def rise_hours_for_peak(feedings: list[dict], peak_dt: datetime) -> float | None:
+    """Hours from the most recent feeding at/before ``peak_dt`` to the peak.
+
+    This is the starter's "rise time" — how long it took to reach peak after
+    being fed. Returns None if there is no feeding recorded on or before the
+    peak (in which case the rise time cannot be determined).
+    """
+    prior_feedings = [
+        dt
+        for f in feedings
+        if (dt := dt_util.parse_datetime(f.get("timestamp", ""))) is not None
+        and dt <= peak_dt
+    ]
+    if not prior_feedings:
+        return None
+    last_feeding = max(prior_feedings)
+    hours = (peak_dt - last_feeding).total_seconds() / 3600
+    return round(hours, 2) if hours >= 0 else None
 
 
 def estimate_starter_weight(
@@ -267,6 +298,29 @@ class SourdoughCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Hydration % (water / flour * 100)
         hydration_pct = (water_g / flour_g * 100) if flour_g > 0 else 100.0
 
+        # Descriptive starter metadata (consistency + flour).
+        starter_type = cfg.get(CONF_STARTER_TYPE, DEFAULT_STARTER_TYPE)
+        flour_type = cfg.get(CONF_FLOUR_TYPE, DEFAULT_FLOUR_TYPE)
+
+        # Peak / readiness history. Each recorded peak stores the rise time
+        # (hours from the feeding that preceded it). These power the rise-time
+        # sensors and let bakers see how lively the starter is over time.
+        peaks: list[dict] = self._stored.get("peaks", [])
+        rise_times = [
+            float(p["rise_hours"])
+            for p in peaks
+            if p.get("rise_hours") is not None
+        ]
+        last_peak_dt: datetime | None = None
+        last_rise_hours: float | None = None
+        if peaks:
+            last_peak_dt = dt_util.parse_datetime(peaks[-1].get("timestamp", ""))
+            last_rise = peaks[-1].get("rise_hours")
+            last_rise_hours = float(last_rise) if last_rise is not None else None
+        average_rise_hours = (
+            round(sum(rise_times) / len(rise_times), 2) if rise_times else None
+        )
+
         # Estimated starter weight (excluding vessel)
         starter_weight_g = self._estimate_starter_weight(
             feedings, flour_g, water_g, discard_ratio
@@ -306,6 +360,14 @@ class SourdoughCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "discard_amount_g": round(discard_amount_g, 1),
             "starter_after_discard_g": round(starter_after_discard_g, 1),
             "hydration_pct": round(hydration_pct, 1),
+            # Starter metadata
+            "starter_type": starter_type,
+            "flour_type": flour_type,
+            # Peak / readiness
+            "last_peak_dt": last_peak_dt.isoformat() if last_peak_dt else None,
+            "last_rise_hours": last_rise_hours,
+            "average_rise_hours": average_rise_hours,
+            "peak_count": len(peaks),
             # Display
             "instructions": instructions,
             # Raw start for display
@@ -327,6 +389,11 @@ class SourdoughCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def feedings(self) -> list[dict]:
         """Return the recorded feeding log (oldest first)."""
         return list(self._stored.get("feedings", []))
+
+    @property
+    def peaks(self) -> list[dict]:
+        """Return the recorded peak log (oldest first)."""
+        return list(self._stored.get("peaks", []))
 
     # ------------------------------------------------------------------
     # Mutating operations
@@ -361,6 +428,29 @@ class SourdoughCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._stored.setdefault("feedings", []).append(feeding)
         # A real feeding resets the schedule, so any outstanding skip is cleared.
         self._stored.pop("next_due_override", None)
+        await self._store.async_save(self._stored)
+        await self.async_refresh()
+
+    async def async_log_peak(self, timestamp: datetime | None = None) -> None:
+        """Record that the starter reached its peak (fully risen).
+
+        The rise time — hours since the most recent feeding on or before the
+        peak — is computed and stored alongside the timestamp, building a
+        history of how quickly the starter rises. ``timestamp`` may be in the
+        past, so a peak can be logged after the fact (e.g. "it peaked an hour
+        ago") rather than only at the exact moment it happens.
+        """
+        peak_dt = timestamp or dt_util.now()
+        feedings = self._stored.get("feedings", [])
+        rise_hours = rise_hours_for_peak(feedings, peak_dt)
+        peak: dict[str, Any] = {
+            "timestamp": peak_dt.isoformat(),
+            "rise_hours": rise_hours,
+        }
+        # Keep the log ordered oldest-first even when back-dating a peak.
+        peaks = self._stored.setdefault("peaks", [])
+        peaks.append(peak)
+        peaks.sort(key=lambda p: p.get("timestamp", ""))
         await self._store.async_save(self._stored)
         await self.async_refresh()
 
