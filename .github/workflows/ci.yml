@@ -55,11 +55,24 @@ jobs:
           VERSION=$(python3 -c "import json; print(json.load(open('custom_components/sourdough/manifest.json'))['version'])")
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Check if release already exists
+      # A leftover tag (e.g. pushed from a stale branch) would otherwise be
+      # silently reused by `gh release create`, publishing a release whose
+      # contents don't match the version it claims to be. Check for both the
+      # release and the tag, and fail loudly if a mismatched tag exists.
+      - name: Check if release or tag already exists
         id: tag_check
         run: |
-          if gh release view "v${{ steps.version.outputs.version }}" --repo "$GITHUB_REPOSITORY" &>/dev/null; then
+          VERSION="${{ steps.version.outputs.version }}"
+          if gh release view "v$VERSION" --repo "$GITHUB_REPOSITORY" &>/dev/null; then
+            echo "Release v$VERSION already exists; skipping."
             echo "exists=true" >> "$GITHUB_OUTPUT"
+          elif TAG_SHA=$(git ls-remote --exit-code --tags origin "refs/tags/v$VERSION" | cut -f1); then
+            if [ "$TAG_SHA" = "$GITHUB_SHA" ]; then
+              echo "exists=false" >> "$GITHUB_OUTPUT"
+            else
+              echo "::error::Tag v$VERSION already exists at $TAG_SHA (not $GITHUB_SHA). Delete the stale tag or bump the version."
+              exit 1
+            fi
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
@@ -71,6 +84,7 @@ jobs:
         run: |
           gh release create "v${{ steps.version.outputs.version }}" \
             --title "v${{ steps.version.outputs.version }}" \
+            --target "$GITHUB_SHA" \
             --generate-notes
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
