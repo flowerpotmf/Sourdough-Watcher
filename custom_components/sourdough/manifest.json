@@ -1,7 +1,7 @@
 {
   "domain": "sourdough",
   "name": "Sourdough Monitor",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "documentation": "https://github.com/flowerpotmf/Sourdough-Watcher",
   "issue_tracker": "https://github.com/flowerpotmf/Sourdough-Watcher/issues",
   "codeowners": ["@flowerpotmf"],
