@@ -1,0 +1,40 @@
+blueprint:
+  name: Sourdough — Peak Ready Notification
+  description: >
+    Notify when the starter is predicted to have peaked (ready to bake or feed),
+    based on its average rise time. Requires a few logged peaks so the
+    integration has an average to predict from.
+  domain: automation
+  source_url: https://github.com/flowerpotmf/Sourdough-Watcher/blob/main/blueprints/automation/sourdough/peak_ready.yaml
+  input:
+    peak_due_sensor:
+      name: Peak Due binary sensor
+      description: The Sourdough Monitor "Peak Due" binary sensor.
+      selector:
+        entity:
+          filter:
+            integration: sourdough
+            domain: binary_sensor
+    notify_service:
+      name: Notify service
+      description: 'Notify service to call, e.g. notify.mobile_app_your_phone'
+      default: notify.notify
+      selector:
+        text:
+    message:
+      name: Message
+      default: "🍞 Your sourdough starter should be at its peak — ready to bake or feed."
+      selector:
+        text:
+
+trigger:
+  - platform: state
+    entity_id: !input peak_due_sensor
+    to: "on"
+
+action:
+  - service: !input notify_service
+    data:
+      message: !input message
+
+mode: single

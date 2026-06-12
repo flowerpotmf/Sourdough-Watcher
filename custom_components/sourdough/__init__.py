@@ -7,13 +7,14 @@ import logging
 import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 from homeassistant.helpers import config_validation as cv
 
 from .const import (
     CONF_UNIT_SYSTEM,
     DOMAIN,
     GRAMS_PER_OZ,
+    SERVICE_EXPORT_HISTORY,
     SERVICE_LOG_PEAK,
     SERVICE_RECORD_FEEDING,
     SERVICE_RESET,
@@ -34,6 +35,7 @@ _PLATFORMS = [
     Platform.SWITCH,
     Platform.BUTTON,
     Platform.CALENDAR,
+    Platform.DATETIME,
 ]
 
 
@@ -67,6 +69,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             hass.services.async_remove(DOMAIN, SERVICE_SET_WEIGHT)
             hass.services.async_remove(DOMAIN, SERVICE_SKIP_FEEDING)
             hass.services.async_remove(DOMAIN, SERVICE_LOG_PEAK)
+            hass.services.async_remove(DOMAIN, SERVICE_EXPORT_HISTORY)
     return unload_ok
 
 
@@ -268,4 +271,28 @@ def _register_services(
             SERVICE_LOG_PEAK,
             handle_log_peak,
             schema=log_peak_schema,
+        )
+
+    # Service: export_history (returns the feeding + peak log as response data)
+    export_schema = vol.Schema(
+        {
+            vol.Optional("entry_id"): cv.string,
+        }
+    )
+
+    async def handle_export_history(call: ServiceCall) -> dict:
+        target_entry_id = call.data.get("entry_id", entry.entry_id)
+        target_coordinator: SourdoughCoordinator = hass.data[DOMAIN].get(target_entry_id)
+        if target_coordinator is None:
+            _LOGGER.error("No sourdough entry found with id: %s", target_entry_id)
+            return {}
+        return target_coordinator.history_export()
+
+    if not hass.services.has_service(DOMAIN, SERVICE_EXPORT_HISTORY):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_EXPORT_HISTORY,
+            handle_export_history,
+            schema=export_schema,
+            supports_response=SupportsResponse.ONLY,
         )

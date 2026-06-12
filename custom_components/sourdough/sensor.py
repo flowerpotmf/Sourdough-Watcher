@@ -26,6 +26,7 @@ from .const import (
     SENSOR_AVG_RISE_TIME,
     SENSOR_DAY,
     SENSOR_DISCARD_AMOUNT,
+    SENSOR_ESTIMATED_PEAK,
     SENSOR_FEEDING_COUNT,
     SENSOR_FLOUR_TO_ADD,
     SENSOR_HYDRATION,
@@ -112,6 +113,7 @@ async def async_setup_entry(
         SourdoughFeedingCountSensor(coordinator, entry, unit_system),
         SourdoughInstructionsSensor(coordinator, entry, unit_system),
         SourdoughLastPeakSensor(coordinator, entry, unit_system),
+        SourdoughEstimatedPeakSensor(coordinator, entry, unit_system),
         SourdoughRiseTimeSensor(
             coordinator, entry, unit_system,
             key=SENSOR_RISE_TIME,
@@ -398,6 +400,30 @@ class SourdoughLastPeakSensor(SourdoughBaseSensor):
         }
 
 
+class SourdoughEstimatedPeakSensor(SourdoughBaseSensor):
+    """Predicted time the current feeding will peak (last fed + average rise)."""
+
+    def __init__(self, coordinator, entry, unit_system):
+        super().__init__(coordinator, entry, unit_system, SENSOR_ESTIMATED_PEAK, "Estimated Peak", "mdi:bread-slice-outline")
+        self._attr_device_class = SensorDeviceClass.TIMESTAMP
+
+    @property
+    def native_value(self) -> datetime | None:
+        raw = self._data.get("estimated_peak_dt")
+        if raw:
+            return dt_util.parse_datetime(raw)
+        return None
+
+    @property
+    def extra_state_attributes(self):
+        data = self._data
+        return {
+            "average_rise_hours": data.get("average_rise_hours"),
+            "peak_due": data.get("peak_due"),
+            "has_peaked_this_cycle": data.get("has_peaked_this_cycle"),
+        }
+
+
 class SourdoughRiseTimeSensor(SourdoughBaseSensor):
     """Rise time in hours (last or average), recorded for long-term history."""
 
@@ -413,4 +439,9 @@ class SourdoughRiseTimeSensor(SourdoughBaseSensor):
 
     @property
     def extra_state_attributes(self):
-        return {"peak_count": self._data.get("peak_count")}
+        data = self._data
+        return {
+            "peak_count": data.get("peak_count"),
+            "rolling_window": data.get("rolling_window"),
+            "all_time_average_rise_hours": data.get("all_time_average_rise_hours"),
+        }

@@ -359,6 +359,77 @@ class TestComputeState:
         assert state["last_rise_hours"] == pytest.approx(8.0)
         assert state["last_peak_dt"] == peak_time.isoformat()
 
+    async def test_estimated_peak_from_average_rise(self, hass):
+        """Estimated peak = last feeding + average rise time."""
+        last_fed = _NOW - timedelta(hours=3)
+        stored = {
+            "start_datetime": _ts(_NOW - timedelta(days=9)),
+            "feedings": [
+                {"timestamp": _ts(last_fed), "flour_g": 60, "water_g": 60, "discarded_g": 0}
+            ],
+            "peaks": [
+                {"timestamp": _ts(_NOW - timedelta(days=1)), "rise_hours": 6.0}
+            ],
+        }
+        coord = _make_coord(hass, stored=stored)
+        with patch(_DT_NOW, return_value=_NOW):
+            state = coord._compute_state()
+        assert state["average_rise_hours"] == pytest.approx(6.0)
+        assert state["estimated_peak_dt"] == (last_fed + timedelta(hours=6)).isoformat()
+        # Fed 3h ago + 6h rise → 3h in the future, so not due and not yet peaked.
+        assert state["peak_due"] is False
+        assert state["has_peaked_this_cycle"] is False
+
+    async def test_peak_due_when_estimate_passed(self, hass):
+        """Peak Due turns on once the estimated peak time is reached."""
+        last_fed = _NOW - timedelta(hours=8)
+        stored = {
+            "start_datetime": _ts(_NOW - timedelta(days=9)),
+            "feedings": [
+                {"timestamp": _ts(last_fed), "flour_g": 60, "water_g": 60, "discarded_g": 0}
+            ],
+            "peaks": [
+                {"timestamp": _ts(_NOW - timedelta(days=2)), "rise_hours": 6.0}
+            ],
+        }
+        coord = _make_coord(hass, stored=stored)
+        with patch(_DT_NOW, return_value=_NOW):
+            state = coord._compute_state()
+        # Fed 8h ago + 6h rise = 2h ago → due, and no peak logged this cycle.
+        assert state["peak_due"] is True
+
+    async def test_rolling_average_uses_recent_peaks(self, hass):
+        """Average rise time uses the last ROLLING_PEAKS_WINDOW (5) peaks only."""
+        rises = [10.0, 10.0, 10.0, 2.0, 2.0, 2.0]  # 6 peaks; last 5 = 10,10,2,2,2
+        peaks = [
+            {"timestamp": _ts(_NOW - timedelta(days=6 - i)), "rise_hours": r}
+            for i, r in enumerate(rises)
+        ]
+        stored = {"start_datetime": _ts(_NOW - timedelta(days=9)), "feedings": [], "peaks": peaks}
+        coord = _make_coord(hass, stored=stored)
+        with patch(_DT_NOW, return_value=_NOW):
+            state = coord._compute_state()
+        assert state["average_rise_hours"] == pytest.approx(5.2)   # (10+10+2+2+2)/5
+        assert state["all_time_average_rise_hours"] == pytest.approx(6.0)  # 36/6
+
+    async def test_history_export_summary(self, hass):
+        stored = {
+            "start_datetime": _ts(_NOW),
+            "feedings": [
+                {"timestamp": _ts(_NOW), "flour_g": 60, "water_g": 60, "discarded_g": 0},
+                {"timestamp": _ts(_NOW + timedelta(hours=24)), "flour_g": 60, "water_g": 60, "discarded_g": 50},
+            ],
+            "peaks": [{"timestamp": _ts(_NOW), "rise_hours": 6.0}],
+        }
+        coord = _make_coord(hass, stored=stored)
+        exp = coord.history_export()
+        assert exp["summary"]["total_feedings"] == 2
+        assert exp["summary"]["total_flour_g"] == pytest.approx(120.0)
+        assert exp["summary"]["total_discarded_g"] == pytest.approx(50.0)
+        assert exp["summary"]["peak_count"] == 1
+        assert exp["summary"]["average_rise_hours"] == pytest.approx(6.0)
+        assert len(exp["feedings"]) == 2
+
     async def test_skip_feeding_pushes_next_due_by_one_interval(self, hass):
         """Skipping advances the next-feeding time by one interval, no feeding logged."""
         last_fed = _NOW - timedelta(hours=1)

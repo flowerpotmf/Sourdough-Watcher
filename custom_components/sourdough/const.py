@@ -37,6 +37,11 @@ DEFAULT_VESSEL_TARE_GRAMS = 0.0
 # DEFAULT_MAINTENANCE_INTERVAL_HOURS) rather than fixed by the recipe.
 MAINTENANCE_START_DAY = 8
 
+# Number of most-recent peaks averaged for the "average rise time" / ready-to-bake
+# estimate. A rolling window keeps the figure representative of the starter's
+# current vigour rather than being dragged by months-old data.
+ROLLING_PEAKS_WINDOW = 5
+
 # Default maintenance feeding interval (hours). 12h suits a starter kept at
 # room temperature. Bakers who follow a fridge-stored, weekly-feeding routine
 # (e.g. Hendrik Kleinwächter's "The Sourdough Framework") can set this to 168h
@@ -120,6 +125,7 @@ SERVICE_SET_DAY = "set_day"
 SERVICE_SET_WEIGHT = "set_weight"
 SERVICE_SKIP_FEEDING = "skip_feeding"
 SERVICE_LOG_PEAK = "log_peak"
+SERVICE_EXPORT_HISTORY = "export_history"
 
 # Sensor unique ID suffixes
 SENSOR_DAY = "day"
@@ -138,3 +144,4 @@ SENSOR_HYDRATION = "hydration"
 SENSOR_LAST_PEAK = "last_peak"
 SENSOR_RISE_TIME = "rise_time"
 SENSOR_AVG_RISE_TIME = "avg_rise_time"
+SENSOR_ESTIMATED_PEAK = "estimated_peak"
