@@ -111,7 +111,8 @@ feeding calendar.
 | `sensor.sourdough_total_feedings` | Count of feedings recorded |
 | `sensor.sourdough_last_peak` | Timestamp of the most recent logged peak |
 | `sensor.sourdough_last_rise_time` | Rise time (hours) of the most recent peak — long-term history enabled |
-| `sensor.sourdough_average_rise_time` | Average rise time across all logged peaks |
+| `sensor.sourdough_average_rise_time` | Average rise time over the last few peaks (rolling) |
+| `sensor.sourdough_estimated_peak` | Predicted time the current feeding will peak (last fed + average rise) |
 | `sensor.sourdough_instructions` | Plain-text instructions for the current step |
 
 Weight sensors include both grams and ounces as extra attributes, regardless of the configured unit system. Flour/water sensors also include a `volume_hint` attribute (e.g., `"1/2 cup"`) for convenience. The rise-time sensors carry the `measurement` state class, so Home Assistant keeps long-term statistics you can graph with a History or Statistics card.
@@ -121,11 +122,13 @@ Weight sensors include both grams and ounces as extra attributes, regardless of 
 | Entity | Description |
 |--------|-------------|
 | `binary_sensor.sourdough_feeding_due` | On when a feeding is due/overdue (device class *problem*) |
+| `binary_sensor.sourdough_peak_due` | On when the starter is predicted to have peaked (ready to bake) |
 | `select.sourdough_maintenance_cadence` | Quick preset switch for the Day 8+ interval (12h / 24h / 48h / weekly) |
 | `switch.sourdough_discard_during_maintenance` | Toggle discarding during the maintenance phase |
 | `button.sourdough_record_feeding` | Record a feeding using the configured amounts |
 | `button.sourdough_log_peak` | Log that the starter peaked **now** (records rise time) |
 | `datetime.sourdough_log_peak_at` | Log a peak at a **chosen time** (for when you didn't catch it exactly) |
+| `datetime.sourdough_record_feeding_at` | Record a feeding at a **chosen time** (for catching up on a missed log) |
 | `button.sourdough_skip_feeding` | Skip (snooze) the next feeding by one interval |
 | `button.sourdough_reset_process` | Reset the process back to Day 1 |
 | `number.sourdough_current_day` | Set the current recipe day (for mid-recipe setup) |
@@ -180,7 +183,34 @@ Restart from Day 1 with an empty feeding log.
 service: sourdough.reset_process
 ```
 
+### `sourdough.export_history`
+
+Return the full feeding and peak log, plus summary totals (total flour/water/discard,
+feeding and peak counts, average rise time), as response data — useful for
+record-keeping or migrating between Home Assistant instances.
+
+```yaml
+service: sourdough.export_history
+response_variable: sourdough_history
+```
+
 If you have multiple sourdough trackers, add `entry_id` to target a specific one.
+
+---
+
+## Automation Blueprints
+
+Ready-made blueprints save you writing the YAML below by hand. Import a blueprint by
+pasting its URL into **Settings → Automations & Scenes → Blueprints → Import Blueprint**:
+
+| Blueprint | What it does |
+|-----------|--------------|
+| [Feeding Due Notification](https://github.com/flowerpotmf/Sourdough-Watcher/blob/main/blueprints/automation/sourdough/feeding_due.yaml) | Notify when the starter is due for a feeding |
+| [Peak Ready Notification](https://github.com/flowerpotmf/Sourdough-Watcher/blob/main/blueprints/automation/sourdough/peak_ready.yaml) | Notify when the starter is predicted to have peaked |
+| [Take Out of Fridge (Day Before)](https://github.com/flowerpotmf/Sourdough-Watcher/blob/main/blueprints/automation/sourdough/fridge_day_before.yaml) | Daily check that reminds you the evening before a weekly feeding |
+
+Each asks you to pick the relevant Sourdough entity and enter a notify service
+(e.g. `notify.mobile_app_your_phone`).
 
 ---
 

@@ -163,6 +163,23 @@ reset_process:
       selector:
         text:
 
+export_history:
+  name: Export History
+  description: >
+    Return the full feeding and peak log (plus summary totals) as response
+    data, for record-keeping or moving between Home Assistant instances. Call
+    with a response variable to capture the result.
+  fields:
+    entry_id:
+      name: Entry ID
+      description: >
+        The config entry ID of the sourdough tracker to export. Omit if you
+        only have one sourdough tracker configured.
+      required: false
+      example: "abc123def456"
+      selector:
+        text:
+
 log_peak:
   name: Log Peak
   description: >

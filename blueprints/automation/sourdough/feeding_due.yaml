@@ -1,0 +1,38 @@
+blueprint:
+  name: Sourdough — Feeding Due Notification
+  description: >
+    Send a notification when your sourdough starter is due for a feeding.
+  domain: automation
+  source_url: https://github.com/flowerpotmf/Sourdough-Watcher/blob/main/blueprints/automation/sourdough/feeding_due.yaml
+  input:
+    feeding_due_sensor:
+      name: Feeding Due binary sensor
+      description: The Sourdough Monitor "Feeding Due" binary sensor.
+      selector:
+        entity:
+          filter:
+            integration: sourdough
+            domain: binary_sensor
+    notify_service:
+      name: Notify service
+      description: 'Notify service to call, e.g. notify.mobile_app_your_phone'
+      default: notify.notify
+      selector:
+        text:
+    message:
+      name: Message
+      default: "🍞 Your sourdough starter is due for a feeding."
+      selector:
+        text:
+
+trigger:
+  - platform: state
+    entity_id: !input feeding_due_sensor
+    to: "on"
+
+action:
+  - service: !input notify_service
+    data:
+      message: !input message
+
+mode: single

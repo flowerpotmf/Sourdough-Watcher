@@ -31,6 +31,7 @@ from .const import (
     DEFAULT_WATER_GRAMS,
     DOMAIN,
     RECIPE_PHASES,
+    ROLLING_PEAKS_WINDOW,
     STORAGE_KEY,
     STORAGE_VERSION,
 )
@@ -317,8 +318,37 @@ class SourdoughCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             last_peak_dt = dt_util.parse_datetime(peaks[-1].get("timestamp", ""))
             last_rise = peaks[-1].get("rise_hours")
             last_rise_hours = float(last_rise) if last_rise is not None else None
+        # Average rise time over the most recent ROLLING_PEAKS_WINDOW peaks so the
+        # figure tracks the starter's *current* vigour; the all-time average is
+        # kept alongside as an attribute.
+        recent_rise_times = rise_times[-ROLLING_PEAKS_WINDOW:]
         average_rise_hours = (
+            round(sum(recent_rise_times) / len(recent_rise_times), 2)
+            if recent_rise_times
+            else None
+        )
+        all_time_average_rise_hours = (
             round(sum(rise_times) / len(rise_times), 2) if rise_times else None
+        )
+
+        # Ready-to-bake estimate: when the current feeding should peak, from the
+        # average rise time. Only meaningful once we have both a feeding to
+        # measure from and at least one recorded rise time.
+        estimated_peak_dt: datetime | None = None
+        if last_feeding_dt is not None and average_rise_hours is not None:
+            estimated_peak_dt = last_feeding_dt + timedelta(hours=average_rise_hours)
+        has_peaked_this_cycle = bool(
+            last_peak_dt is not None
+            and last_feeding_dt is not None
+            and last_peak_dt > last_feeding_dt
+        )
+        # "Peak due" turns on once the estimated peak time is reached and the
+        # current feeding cycle hasn't been logged as peaked yet — a cue to go
+        # check / use the starter.
+        peak_due = bool(
+            estimated_peak_dt is not None
+            and not has_peaked_this_cycle
+            and now >= estimated_peak_dt
         )
 
         # Estimated starter weight (excluding vessel)
@@ -367,6 +397,11 @@ class SourdoughCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "last_peak_dt": last_peak_dt.isoformat() if last_peak_dt else None,
             "last_rise_hours": last_rise_hours,
             "average_rise_hours": average_rise_hours,
+            "all_time_average_rise_hours": all_time_average_rise_hours,
+            "rolling_window": ROLLING_PEAKS_WINDOW,
+            "estimated_peak_dt": estimated_peak_dt.isoformat() if estimated_peak_dt else None,
+            "has_peaked_this_cycle": has_peaked_this_cycle,
+            "peak_due": peak_due,
             "peak_count": len(peaks),
             # Display
             "instructions": instructions,
@@ -394,6 +429,37 @@ class SourdoughCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def peaks(self) -> list[dict]:
         """Return the recorded peak log (oldest first)."""
         return list(self._stored.get("peaks", []))
+
+    def history_export(self) -> dict[str, Any]:
+        """Return a serialisable snapshot of all recorded history plus summary.
+
+        Used by the ``export_history`` service so the feeding and peak logs can
+        be pulled out for record-keeping or moving between Home Assistant
+        instances.
+        """
+        feedings = self.feedings
+        peaks = self.peaks
+
+        def _total(key: str) -> float:
+            return round(sum(float(f.get(key, 0) or 0) for f in feedings), 1)
+
+        rise_times = [
+            float(p["rise_hours"]) for p in peaks if p.get("rise_hours") is not None
+        ]
+        avg_rise = round(sum(rise_times) / len(rise_times), 2) if rise_times else None
+        return {
+            "start_datetime": self._stored.get("start_datetime"),
+            "feedings": feedings,
+            "peaks": peaks,
+            "summary": {
+                "total_feedings": len(feedings),
+                "total_flour_g": _total("flour_g"),
+                "total_water_g": _total("water_g"),
+                "total_discarded_g": _total("discarded_g"),
+                "peak_count": len(peaks),
+                "average_rise_hours": avg_rise,
+            },
+        }
 
     # ------------------------------------------------------------------
     # Mutating operations

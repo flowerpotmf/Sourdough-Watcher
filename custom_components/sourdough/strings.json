@@ -83,6 +83,10 @@
     "log_peak": {
       "name": "Log Peak",
       "description": "Record that the starter has reached its peak (fully risen) and store the rise time since the last feeding."
+    },
+    "export_history": {
+      "name": "Export History",
+      "description": "Return the full feeding and peak log plus summary totals as response data."
     }
   }
 }

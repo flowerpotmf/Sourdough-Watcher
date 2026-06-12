@@ -31,7 +31,10 @@ async def async_setup_entry(
 ) -> None:
     """Set up the Sourdough Monitor datetime entities."""
     coordinator: SourdoughCoordinator = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities([SourdoughLogPeakAtDateTime(coordinator, entry)])
+    async_add_entities([
+        SourdoughLogPeakAtDateTime(coordinator, entry),
+        SourdoughRecordFeedingAtDateTime(coordinator, entry),
+    ])
 
 
 class SourdoughLogPeakAtDateTime(
@@ -63,3 +66,37 @@ class SourdoughLogPeakAtDateTime(
 
     async def async_set_value(self, value: datetime) -> None:
         await self.coordinator.async_log_peak(timestamp=value)
+
+
+class SourdoughRecordFeedingAtDateTime(
+    CoordinatorEntity[SourdoughCoordinator], DateTimeEntity
+):
+    """Record a feeding at a chosen time.
+
+    Like the **Record Feeding** button (configured amounts, with discard applied
+    when the current phase calls for it), but lets you set the time the feeding
+    actually happened — useful for catching up after forgetting to log one.
+    """
+
+    _attr_has_entity_name = True
+    _attr_name = "Record Feeding At"
+    _attr_icon = "mdi:calendar-clock"
+
+    def __init__(self, coordinator: SourdoughCoordinator, entry: ConfigEntry) -> None:
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{entry.entry_id}_record_feeding_at"
+        self._attr_device_info = _device_info(entry)
+
+    @property
+    def native_value(self) -> datetime | None:
+        raw = (self.coordinator.data or {}).get("last_feeding_dt")
+        if raw:
+            return dt_util.parse_datetime(raw)
+        return None
+
+    async def async_set_value(self, value: datetime) -> None:
+        data = self.coordinator.data or {}
+        discarded_g = data.get("discard_amount_g", 0.0) if data.get("should_discard") else 0.0
+        await self.coordinator.async_record_feeding(
+            discarded_g=discarded_g, timestamp=value
+        )

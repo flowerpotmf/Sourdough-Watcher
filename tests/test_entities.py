@@ -121,6 +121,37 @@ async def test_log_peak_at_datetime_logs_chosen_time(hass):
     coord.async_log_peak.assert_awaited_once_with(timestamp=chosen)
 
 
+async def test_record_feeding_at_records_with_timestamp(hass):
+    """Setting the Record Feeding At picker records a feeding at the chosen time."""
+    from unittest.mock import AsyncMock
+
+    from custom_components.sourdough.datetime import SourdoughRecordFeedingAtDateTime
+
+    coord, entry = _coord(hass, data={"should_discard": True, "discard_amount_g": 30.0})
+    coord.async_record_feeding = AsyncMock()
+    ent = SourdoughRecordFeedingAtDateTime(coord, entry)
+    chosen = _NOW - timedelta(hours=4)
+    await ent.async_set_value(chosen)
+    coord.async_record_feeding.assert_awaited_once_with(discarded_g=30.0, timestamp=chosen)
+
+
+async def test_peak_due_binary_sensor(hass):
+    from custom_components.sourdough.binary_sensor import SourdoughPeakDueBinarySensor
+
+    coord, entry = _coord(hass, data={"peak_due": True})
+    ent = SourdoughPeakDueBinarySensor(coord, entry)
+    assert ent.is_on is True
+
+
+async def test_estimated_peak_sensor_reads_value(hass):
+    from custom_components.sourdough.sensor import SourdoughEstimatedPeakSensor
+
+    est = (_NOW + timedelta(hours=2)).isoformat()
+    coord, entry = _coord(hass, data={"estimated_peak_dt": est, "average_rise_hours": 6.0})
+    ent = SourdoughEstimatedPeakSensor(coord, entry, "metric")
+    assert ent.native_value == _NOW + timedelta(hours=2)
+
+
 async def test_rise_time_sensor_reads_value(hass):
     coord, entry = _coord(hass, data={"last_rise_hours": 5.5, "peak_count": 2})
     ent = SourdoughRiseTimeSensor(
