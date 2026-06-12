@@ -80,9 +80,11 @@ value, so weekly feeders no longer get spurious "feeding overdue" alerts.
 
 ### Peak / rise-time tracking
 
-When your starter has fully risen ("peaked"), tap the **Log Peak** button or call
-`sourdough.log_peak`. The integration measures the **rise time** — the hours
-between the most recent feeding and the peak — and stores it. The
+When your starter has fully risen ("peaked"), tap the **Log Peak** button (logs
+the current moment), or — if you didn't catch it exactly — use the **Log Peak At**
+date/time picker to record the time it actually peaked. Either way the integration
+measures the **rise time** — the hours between the most recent feeding and the
+peak — and stores it. The
 `sensor.sourdough_last_rise_time` and `sensor.sourdough_average_rise_time` sensors
 expose this with long-term statistics, so you can chart how your starter's vigour
 changes with temperature, flour, or season. Missed the exact moment? Call the
@@ -122,7 +124,8 @@ Weight sensors include both grams and ounces as extra attributes, regardless of 
 | `select.sourdough_maintenance_cadence` | Quick preset switch for the Day 8+ interval (12h / 24h / 48h / weekly) |
 | `switch.sourdough_discard_during_maintenance` | Toggle discarding during the maintenance phase |
 | `button.sourdough_record_feeding` | Record a feeding using the configured amounts |
-| `button.sourdough_log_peak` | Log that the starter has reached its peak (records rise time) |
+| `button.sourdough_log_peak` | Log that the starter peaked **now** (records rise time) |
+| `datetime.sourdough_log_peak_at` | Log a peak at a **chosen time** (for when you didn't catch it exactly) |
 | `button.sourdough_skip_feeding` | Skip (snooze) the next feeding by one interval |
 | `button.sourdough_reset_process` | Reset the process back to Day 1 |
 | `number.sourdough_current_day` | Set the current recipe day (for mid-recipe setup) |

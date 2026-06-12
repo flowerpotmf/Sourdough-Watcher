@@ -34,6 +34,7 @@ _PLATFORMS = [
     Platform.SWITCH,
     Platform.BUTTON,
     Platform.CALENDAR,
+    Platform.DATETIME,
 ]
 
 

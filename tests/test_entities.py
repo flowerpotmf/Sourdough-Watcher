@@ -89,6 +89,38 @@ async def test_device_name_falls_back_when_unnamed(hass):
     assert _device_info(entry)["name"] == "Sourdough Monitor"
 
 
+async def test_log_peak_at_datetime_reads_last_peak(hass):
+    """The Log Peak At picker reflects the most recent logged peak."""
+    from custom_components.sourdough.datetime import SourdoughLogPeakAtDateTime
+
+    peak_ts = (_NOW - timedelta(hours=2)).isoformat()
+    coord, entry = _coord(hass, data={"last_peak_dt": peak_ts})
+    ent = SourdoughLogPeakAtDateTime(coord, entry)
+    assert ent.native_value == _NOW - timedelta(hours=2)
+
+
+async def test_log_peak_at_datetime_none_when_no_peak(hass):
+    from custom_components.sourdough.datetime import SourdoughLogPeakAtDateTime
+
+    coord, entry = _coord(hass, data={})
+    ent = SourdoughLogPeakAtDateTime(coord, entry)
+    assert ent.native_value is None
+
+
+async def test_log_peak_at_datetime_logs_chosen_time(hass):
+    """Setting the picker logs a peak at the chosen timestamp."""
+    from unittest.mock import AsyncMock
+
+    from custom_components.sourdough.datetime import SourdoughLogPeakAtDateTime
+
+    coord, entry = _coord(hass, data={})
+    coord.async_log_peak = AsyncMock()
+    ent = SourdoughLogPeakAtDateTime(coord, entry)
+    chosen = _NOW - timedelta(hours=3)
+    await ent.async_set_value(chosen)
+    coord.async_log_peak.assert_awaited_once_with(timestamp=chosen)
+
+
 async def test_rise_time_sensor_reads_value(hass):
     coord, entry = _coord(hass, data={"last_rise_hours": 5.5, "peak_count": 2})
     ent = SourdoughRiseTimeSensor(
